@@ -1,11 +1,9 @@
 services:
   - type: web
-    name: selenium-flask
+    name: selenium-flask-app
     env: python
+    plan: free
     buildCommand: |
-      apt-get update && apt-get install -y xvfb
+      apt-get update && apt-get install -y xvfb xauth
       pip install -r requirements.txt
     startCommand: xvfb-run -a python3 selenium_flask_app.py
-    envVars:
-      - key: PYTHONUNBUFFERED
-        value: "1"
