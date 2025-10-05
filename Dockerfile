@@ -46,26 +46,23 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiamos TODO el proyecto, incluyendo el perfil y la extensión
+# Copiar todo el proyecto, incluyendo el perfil
 COPY . .
 
 # ==============================
-#  Chrome Profile
+#  Chrome Profile (con espacio en el nombre)
 # ==============================
-# Si tu perfil está en chrome_profile_copy/Profile2
-# lo copiamos al lugar donde Chrome lo espera en Linux.
 RUN mkdir -p /root/.config/google-chrome/
-COPY "chrome_profile_copy/Profile 2" /root/.config/google-chrome/Default/
-
+COPY "chrome_profile_copy/Profile 2" "/root/.config/google-chrome/Default/"
 RUN chmod -R 755 /root/.config/google-chrome/Default
 
 # ==============================
 #  Permisos y entorno
 # ==============================
-RUN if [ -d "/app/chrome_profile_copy/Profile2" ]; then chmod -R 755 /app/chrome_profile_copy/Profile2; fi
+# Damos permisos al perfil también dentro de /app
+RUN if [ -d "/app/chrome_profile_copy/Profile 2" ]; then chmod -R 755 "/app/chrome_profile_copy/Profile 2"; fi
 
-# Variables opcionales para debug
-ENV EXT_USER_DATA_DIR=/app/chrome_profile_copy/Profile2
+ENV EXT_USER_DATA_DIR="/app/chrome_profile_copy/Profile 2"
 
 # ==============================
 #  Selenium y WebDriver
