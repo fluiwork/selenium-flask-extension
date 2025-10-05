@@ -50,19 +50,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # ==============================
-#  Chrome Profile (con espacio en el nombre)
+#  Chrome Profile
 # ==============================
 RUN mkdir -p /root/.config/google-chrome/
-COPY 'chrome_profile_copy/Profile 2' '/root/.config/google-chrome/Default/'
+COPY chrome_profile_copy/Profile2 /root/.config/google-chrome/Default/
 RUN chmod -R 755 /root/.config/google-chrome/Default
 
 # ==============================
 #  Permisos y entorno
 # ==============================
-RUN if [ -d "/app/chrome_profile_copy/Profile 2" ]; then chmod -R 755 "/app/chrome_profile_copy/Profile 2"; fi
+RUN if [ -d "/app/chrome_profile_copy/Profile2" ]; then chmod -R 755 /app/chrome_profile_copy/Profile2; fi
 
 # Variables opcionales para debug
-ENV EXT_USER_DATA_DIR="/app/chrome_profile_copy/Profile 2"
+ENV EXT_USER_DATA_DIR=/app/chrome_profile_copy/Profile2
 
 # ==============================
 #  Selenium y WebDriver
