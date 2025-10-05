@@ -1138,5 +1138,7 @@ def process():
     return jsonify(res)
 
 if __name__ == '__main__':
-    logger.info("Iniciando servidor Flask en http://127.0.0.1:5000")
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+
