@@ -1,27 +1,51 @@
-# Imagen base con Python y Chrome
-FROM debian:bookworm-slim
+# Base image Python 3.13 slim
+FROM python:3.13-slim
 
-# Instala dependencias del sistema
+# ⚡ Instalar dependencias del sistema y xvfb
 RUN apt-get update && apt-get install -y \
-    python3 python3-pip python3-venv \
-    xvfb xauth \
-    wget unzip gnupg \
-    chromium chromium-driver \
+    wget \
+    curl \
+    unzip \
+    xvfb \
+    xauth \
+    libnss3 \
+    libxss1 \
+    libappindicator3-1 \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libgtk-3-0 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libpango1.0-0 \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia tu aplicación
+# ⚡ Instalar Google Chrome estable
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+ && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+ && apt-get update \
+ && apt-get install -y google-chrome-stable \
+ && rm -rf /var/lib/apt/lists/*
+
+# ⚡ Crear directorio de la app
 WORKDIR /app
-COPY . /app
 
-# Crea y usa un entorno virtual para instalar dependencias
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# ⚡ Copiar requirements
+COPY requirements.txt .
 
-RUN echo "=== CONTENIDO DE requirements.txt ===" && cat requirements.txt
+# ⚡ Instalar dependencias Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expone el puerto del servidor Flask
-EXPOSE 5000
+# ⚡ Copiar el resto de la app
+COPY . .
 
-# Comando de inicio
-CMD xvfb-run -a python3 selenium_flask_app.py
+# ⚡ Exponer el puerto (Render asigna PORT automáticamente)
+ENV PORT=10000
+EXPOSE $PORT
+
+# ⚡ Comando para Render
+CMD ["xvfb-run", "-a", "python3", "selenium_flask_app.py"]
