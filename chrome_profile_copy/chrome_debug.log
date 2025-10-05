@@ -1,96 +1,218 @@
-[20704:20900:1005/133700.115:INFO:components\enterprise\browser\controller\chrome_browser_cloud_management_controller.cc:206] No machine level policy manager exists.
-[20704:20900:1005/133700.944:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
-[20704:20900:1005/133700.944:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
-[20704:20900:1005/133700.946:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
-[20704:20900:1005/133700.946:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
-[20704:20900:1005/133701.758:INFO:CONSOLE:0] "Refused to execute script from 'https://clientes.celsia.com/clientes/cordova.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.", source: https://clientes.celsia.com/clientes/login (0)
-[20704:20900:1005/133701.760:INFO:CONSOLE:47] "MATOMO ::  ", source: https://clientes.celsia.com/clientes/login (47)
-[20704:20900:1005/133702.262:INFO:CONSOLE:2] "[DEPRECATION][Events]: The Events provider is deprecated and it will be removed in the next major release.
+[15940:20408:1005/172628.825:INFO:components\enterprise\browser\controller\chrome_browser_cloud_management_controller.cc:206] No machine level policy manager exists.
+[15940:20408:1005/172629.484:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
+[15940:20408:1005/172629.484:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
+[15940:20408:1005/172629.494:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
+[15940:20408:1005/172629.495:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
+[15940:20408:1005/172630.260:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
+[15940:20408:1005/172630.276:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
+[15940:20408:1005/172631.440:INFO:CONSOLE:0] "Refused to execute script from 'https://clientes.celsia.com/clientes/cordova.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.", source: https://clientes.celsia.com/clientes/login (0)
+[15940:20408:1005/172631.444:INFO:CONSOLE:47] "MATOMO ::  ", source: https://clientes.celsia.com/clientes/login (47)
+[15940:20408:1005/172631.837:INFO:CONSOLE:2] "[DEPRECATION][Events]: The Events provider is deprecated and it will be removed in the next major release.
   - Use "Observables" for a similar pub/sub architecture: https://angular.io/guide/observables
   - Use "Redux" for advanced state management: https://ngrx.io", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.270:INFO:CONSOLE:2] "Usuario Logueado => [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.270:INFO:CONSOLE:2] "Validando la campaña...", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.309:INFO:CONSOLE:2] "Angular is running in the development mode. Call enableProdMode() to enable the production mode.", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.311:INFO:CONSOLE:2] "Native: tried calling StatusBar.styleDefault, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.311:INFO:CONSOLE:2] "Native: tried calling SplashScreen.hide, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.311:INFO:CONSOLE:2] "Native: tried calling CodePush.checkForUpdate, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.311:INFO:CONSOLE:2] "Native: tried calling CodePush.sync, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.311:INFO:CONSOLE:2] "error::  cordova_not_available", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133702.393:INFO:CONSOLE:314] "Google Maps JavaScript API has been loaded directly without loading=async. This can result in suboptimal performance. For best-practice loading patterns please see https://goo.gle/js-api-loading", source: https://maps.googleapis.com/maps/api/js?key=AIzaSyBMORYb-k1BCCl2jWBvGqL9BAcp4TGKFlg (314)
-[20704:20900:1005/133702.659:INFO:CONSOLE:1] "ERROR  [object Object]", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
-[20704:20900:1005/133702.686:INFO:CONSOLE:1] "ERROR  [object Object]", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
-[20704:20900:1005/133702.847:INFO:CONSOLE:1] "Hogar", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133702.849:INFO:CONSOLE:1] "ES CORPORATIVO  false", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133703.027:INFO:CONSOLE:2] "APPCOMPONENT SERVER RESPONSE...  [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133703.027:INFO:CONSOLE:2] "CAMPAÑA ::  null", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133703.384:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
-[20704:20900:1005/133703.390:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
-[20704:20900:1005/133703.443:INFO:CONSOLE:0] "[DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o", source: https://loginunico-prd-front-app.azurewebsites.net/login/1 (0)
-[20704:20900:1005/133703.571:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133703.571:INFO:CONSOLE:1] "cuentas configuradas... [object Object],[object Object]", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133703.571:INFO:CONSOLE:2] "hideLoader overlay does not exist", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133703.965:INFO:CONSOLE:1] "Hogar", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133703.965:INFO:CONSOLE:1] "ES CORPORATIVO  false", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133704.126:INFO:CONSOLE:0] "<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">", source: https://clientes.celsia.com/clientes/perfil (0)
-[20704:20900:1005/133704.176:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.176:INFO:CONSOLE:1] "cuentas configuradas... [object Object],[object Object]", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133704.176:INFO:CONSOLE:2] "hideLoader overlay does not exist", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.466:INFO:CONSOLE:1] "ERROR  TypeError: Failed to fetch", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133704.594:INFO:CONSOLE:0] "Refused to execute script from 'https://clientes.celsia.com/clientes/cordova.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.", source: https://clientes.celsia.com/clientes/perfil (0)
-[20704:20900:1005/133704.596:INFO:CONSOLE:47] "MATOMO ::  ", source: https://clientes.celsia.com/clientes/perfil (47)
-[20704:20900:1005/133704.630:INFO:CONSOLE:314] "Google Maps JavaScript API has been loaded directly without loading=async. This can result in suboptimal performance. For best-practice loading patterns please see https://goo.gle/js-api-loading", source: https://maps.googleapis.com/maps/api/js?key=AIzaSyBMORYb-k1BCCl2jWBvGqL9BAcp4TGKFlg (314)
-[20704:20900:1005/133704.856:INFO:CONSOLE:2] "[DEPRECATION][Events]: The Events provider is deprecated and it will be removed in the next major release.
+[15940:20408:1005/172631.841:INFO:CONSOLE:2] "Usuario Logueado => null", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172631.886:INFO:CONSOLE:2] "Angular is running in the development mode. Call enableProdMode() to enable the production mode.", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172631.887:INFO:CONSOLE:2] "Native: tried calling StatusBar.styleDefault, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172631.887:INFO:CONSOLE:2] "Native: tried calling SplashScreen.hide, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172631.887:INFO:CONSOLE:2] "Native: tried calling CodePush.checkForUpdate, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172631.888:INFO:CONSOLE:2] "Native: tried calling CodePush.sync, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172631.888:INFO:CONSOLE:2] "error::  cordova_not_available", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172631.986:INFO:CONSOLE:1] "ERROR  null", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172632.087:INFO:CONSOLE:1] "ERROR  null", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172632.557:INFO:CONSOLE:314] "Google Maps JavaScript API has been loaded directly without loading=async. This can result in suboptimal performance. For best-practice loading patterns please see https://goo.gle/js-api-loading", source: https://maps.googleapis.com/maps/api/js?key=AIzaSyBMORYb-k1BCCl2jWBvGqL9BAcp4TGKFlg (314)
+[15940:20408:1005/172632.595:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172632.596:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172632.651:INFO:CONSOLE:0] "[DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o", source: https://loginunico-prd-front-app.azurewebsites.net/login/1 (0)
+[15940:20408:1005/172632.673:INFO:CONSOLE:1] "Error al guardar datosuser: TypeError: Cannot read properties of undefined (reading 'token')", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172632.699:INFO:CONSOLE:1] "Error al guardar datosuser: TypeError: Cannot read properties of undefined (reading 'token')", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172633.181:INFO:CONSOLE:0] "<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">", source: https://clientes.celsia.com/clientes/login (0)
+[15940:20408:1005/172633.825:INFO:CONSOLE:0] "Refused to execute script from 'https://clientes.celsia.com/clientes/cordova.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.", source: https://clientes.celsia.com/clientes/login (0)
+[15940:20408:1005/172633.826:INFO:CONSOLE:47] "MATOMO ::  ", source: https://clientes.celsia.com/clientes/login (47)
+[15940:20408:1005/172634.136:INFO:CONSOLE:2] "[DEPRECATION][Events]: The Events provider is deprecated and it will be removed in the next major release.
   - Use "Observables" for a similar pub/sub architecture: https://angular.io/guide/observables
   - Use "Redux" for advanced state management: https://ngrx.io", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.865:INFO:CONSOLE:2] "Usuario Logueado => [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.865:INFO:CONSOLE:2] "Validando la campaña...", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.889:INFO:CONSOLE:2] "Angular is running in the development mode. Call enableProdMode() to enable the production mode.", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.889:INFO:CONSOLE:2] "Native: tried calling StatusBar.styleDefault, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.889:INFO:CONSOLE:2] "Native: tried calling SplashScreen.hide, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.889:INFO:CONSOLE:2] "Native: tried calling CodePush.checkForUpdate, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.889:INFO:CONSOLE:2] "Native: tried calling CodePush.sync, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.889:INFO:CONSOLE:2] "error::  cordova_not_available", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133704.986:INFO:CONSOLE:1] "Hogar", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133704.986:INFO:CONSOLE:1] "ES CORPORATIVO  false", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133705.471:INFO:CONSOLE:1] "Hogar", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133705.471:INFO:CONSOLE:1] "ES CORPORATIVO  false", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133705.601:INFO:CONSOLE:0] "<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">", source: https://clientes.celsia.com/clientes/perfil (0)
-[20704:20900:1005/133705.634:INFO:CONSOLE:2] "APPCOMPONENT SERVER RESPONSE...  [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133705.634:INFO:CONSOLE:2] "CAMPAÑA ::  null", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133705.827:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133705.827:INFO:CONSOLE:1] "cuentas configuradas... [object Object],[object Object]", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133705.827:INFO:CONSOLE:2] "hideLoader overlay does not exist", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133706.637:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133706.639:INFO:CONSOLE:1] "cuentas configuradas... [object Object],[object Object]", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
-[20704:20900:1005/133706.639:INFO:CONSOLE:2] "hideLoader overlay does not exist", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133707.475:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133707.477:INFO:CONSOLE:2] "hideLoader overlay does not exist", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:22724:1005/133708.604:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
-[20704:20900:1005/133709.009:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
-[20704:20900:1005/133709.020:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
-[20704:20900:1005/133709.289:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
-[20704:20900:1005/133709.291:INFO:CONSOLE:0] "Unchecked runtime.lastError: Could not establish connection. Receiving end does not exist.", source:  (0)
-[20704:20900:1005/133709.835:INFO:CONSOLE:0] "Unchecked runtime.lastError: The page keeping the extension port is moved into back/forward cache, so the message channel is closed.", source:  (0)
-[20704:20900:1005/133709.848:INFO:CONSOLE:0] "Unchecked runtime.lastError: The page keeping the extension port is moved into back/forward cache, so the message channel is closed.", source:  (0)
-[20704:20900:1005/133709.848:INFO:CONSOLE:0] "Unchecked runtime.lastError: The page keeping the extension port is moved into back/forward cache, so the message channel is closed.", source:  (0)
-[20704:20900:1005/133709.848:INFO:CONSOLE:0] "Unchecked runtime.lastError: The page keeping the extension port is moved into back/forward cache, so the message channel is closed.", source:  (0)
-[20704:20900:1005/133709.848:INFO:CONSOLE:0] "Unchecked runtime.lastError: The page keeping the extension port is moved into back/forward cache, so the message channel is closed.", source:  (0)
-[20704:20900:1005/133709.848:INFO:CONSOLE:0] "Unchecked runtime.lastError: The page keeping the extension port is moved into back/forward cache, so the message channel is closed.", source:  (0)
-[20704:20900:1005/133710.034:INFO:CONSOLE:0] "Refused to execute script from 'https://clientes.celsia.com/clientes/cordova.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.", source: https://clientes.celsia.com/clientes/login (0)
-[20704:20900:1005/133710.043:INFO:CONSOLE:47] "MATOMO ::  ", source: https://clientes.celsia.com/clientes/login (47)
-[20704:20900:1005/133710.369:INFO:CONSOLE:2] "[DEPRECATION][Events]: The Events provider is deprecated and it will be removed in the next major release.
+[15940:20408:1005/172634.143:INFO:CONSOLE:2] "Usuario Logueado => null", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172634.187:INFO:CONSOLE:2] "Angular is running in the development mode. Call enableProdMode() to enable the production mode.", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172634.188:INFO:CONSOLE:2] "Native: tried calling StatusBar.styleDefault, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172634.189:INFO:CONSOLE:2] "Native: tried calling SplashScreen.hide, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172634.189:INFO:CONSOLE:2] "Native: tried calling CodePush.checkForUpdate, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172634.189:INFO:CONSOLE:2] "Native: tried calling CodePush.sync, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172634.189:INFO:CONSOLE:2] "error::  cordova_not_available", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172634.225:INFO:CONSOLE:314] "Google Maps JavaScript API has been loaded directly without loading=async. This can result in suboptimal performance. For best-practice loading patterns please see https://goo.gle/js-api-loading", source: https://maps.googleapis.com/maps/api/js?key=AIzaSyBMORYb-k1BCCl2jWBvGqL9BAcp4TGKFlg (314)
+[15940:20408:1005/172634.304:INFO:CONSOLE:1] "ERROR  null", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172634.388:INFO:CONSOLE:1] "ERROR  null", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172634.699:INFO:CONSOLE:1] "Error al guardar datosuser: TypeError: Cannot read properties of undefined (reading 'token')", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172634.702:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172634.704:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172634.705:INFO:CONSOLE:1] "Error al guardar datosuser: TypeError: Cannot read properties of undefined (reading 'token')", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172634.741:INFO:CONSOLE:0] "[DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o", source: https://loginunico-prd-front-app.azurewebsites.net/login/1 (0)
+[15940:20408:1005/172634.748:INFO:CONSOLE:0] "<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">", source: https://clientes.celsia.com/clientes/login (0)
+[15940:9380:1005/172637.697:ERROR:google_apis\gcm\engine\gcm_store_impl.cc:942] Failed to restore security token.
+[15940:20408:1005/172639.113:INFO:CONSOLE:0] "Refused to execute script from 'https://clientes.celsia.com/clientes/cordova.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.", source: https://clientes.celsia.com/clientes/login (0)
+[15940:20408:1005/172639.114:INFO:CONSOLE:47] "MATOMO ::  ", source: https://clientes.celsia.com/clientes/login (47)
+[15940:20408:1005/172639.435:INFO:CONSOLE:2] "[DEPRECATION][Events]: The Events provider is deprecated and it will be removed in the next major release.
   - Use "Observables" for a similar pub/sub architecture: https://angular.io/guide/observables
   - Use "Redux" for advanced state management: https://ngrx.io", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.373:INFO:CONSOLE:2] "Usuario Logueado => [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.373:INFO:CONSOLE:2] "Validando la campaña...", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.428:INFO:CONSOLE:2] "Angular is running in the development mode. Call enableProdMode() to enable the production mode.", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.433:INFO:CONSOLE:2] "Native: tried calling StatusBar.styleDefault, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.436:INFO:CONSOLE:2] "Native: tried calling SplashScreen.hide, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.436:INFO:CONSOLE:2] "Native: tried calling CodePush.checkForUpdate, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.436:INFO:CONSOLE:2] "Native: tried calling CodePush.sync, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.436:INFO:CONSOLE:2] "error::  cordova_not_available", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
-[20704:20900:1005/133710.553:INFO:CONSOLE:1] "ERROR  [object Object]", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
-[20704:20900:1005/133710.577:INFO:CONSOLE:1] "ERROR  [object Object]", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
-[632:25664:1005/133710.842:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
-[632:14668:1005/133710.846:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
-[632:14668:1005/133710.846:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[15940:20408:1005/172639.440:INFO:CONSOLE:2] "Usuario Logueado => null", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172639.483:INFO:CONSOLE:2] "Angular is running in the development mode. Call enableProdMode() to enable the production mode.", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172639.485:INFO:CONSOLE:2] "Native: tried calling StatusBar.styleDefault, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172639.485:INFO:CONSOLE:2] "Native: tried calling SplashScreen.hide, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172639.485:INFO:CONSOLE:2] "Native: tried calling CodePush.checkForUpdate, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172639.485:INFO:CONSOLE:2] "Native: tried calling CodePush.sync, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172639.485:INFO:CONSOLE:2] "error::  cordova_not_available", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172639.557:INFO:CONSOLE:1] "ERROR  null", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172639.626:INFO:CONSOLE:1] "ERROR  null", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:26880:1005/172639.731:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[15940:20408:1005/172639.875:INFO:CONSOLE:314] "Google Maps JavaScript API has been loaded directly without loading=async. This can result in suboptimal performance. For best-practice loading patterns please see https://goo.gle/js-api-loading", source: https://maps.googleapis.com/maps/api/js?key=AIzaSyBMORYb-k1BCCl2jWBvGqL9BAcp4TGKFlg (314)
+[15940:20408:1005/172639.896:INFO:CONSOLE:1] "Error al guardar datosuser: TypeError: Cannot read properties of undefined (reading 'token')", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172639.912:INFO:CONSOLE:1] "Error al guardar datosuser: TypeError: Cannot read properties of undefined (reading 'token')", source: https://clientes.celsia.com/clientes/63.0b3d9325fb4b3863962d.js (1)
+[15940:20408:1005/172639.978:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172639.978:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.060:INFO:CONSOLE:0] "[DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o", source: https://loginunico-prd-front-app.azurewebsites.net/login/1 (0)
+[15940:20408:1005/172640.260:INFO:CONSOLE:0] "<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">", source: https://clientes.celsia.com/clientes/login (0)
+[15940:20408:1005/172640.683:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.695:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.702:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.707:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.715:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.722:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.729:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.736:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.742:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.747:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.752:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.758:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.763:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.769:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.773:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.778:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.783:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.789:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.792:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.797:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172640.801:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.011:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.011:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.022:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.025:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.028:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.033:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.037:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.045:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.048:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.052:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172641.138:INFO:CONSOLE:112] "portal-login: 1", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (112)
+[15940:20408:1005/172641.138:INFO:CONSOLE:104] "[object Object]", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (104)
+[15940:20408:1005/172641.138:INFO:CONSOLE:104] "URL completa es  /Auth/login", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (104)
+[15940:20408:1005/172642.271:INFO:CONSOLE:112] "respuesta api  [object Object]", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (112)
+[15940:20408:1005/172642.271:INFO:CONSOLE:112] "server responde ...  [object Object]", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (112)
+[15940:20408:1005/172642.271:INFO:CONSOLE:112] "[object Object]", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (112)
+[15940:20408:1005/172642.288:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172642.288:INFO:CONSOLE:96] "Value prop changed: undefined", source: https://loginunico-prd-front-app.azurewebsites.net/assets/index-DeHU0TMI.js (96)
+[15940:20408:1005/172642.358:INFO:CONSOLE:1] "Hogar", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
+[15940:20408:1005/172642.359:INFO:CONSOLE:1] "ES CORPORATIVO  false", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
+[15940:20408:1005/172642.693:INFO:CONSOLE:1] "Hogar", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
+[15940:20408:1005/172642.693:INFO:CONSOLE:1] "ES CORPORATIVO  false", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
+[15940:20408:1005/172642.984:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172642.986:INFO:CONSOLE:1] "cuentas configuradas... [object Object],[object Object]", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
+[15940:20408:1005/172642.986:INFO:CONSOLE:2] "hideLoader overlay does not exist", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172643.281:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172643.282:INFO:CONSOLE:1] "cuentas configuradas... [object Object],[object Object]", source: https://clientes.celsia.com/clientes/23.5e5fddb3ee19067fc7e9.js (1)
+[15940:20408:1005/172643.282:INFO:CONSOLE:2] "hideLoader overlay does not exist", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172644.322:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172644.322:INFO:CONSOLE:2] "hideLoader overlay does not exist", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:29684:1005/172658.900:INFO:chrome\browser\extensions\extension_garbage_collector.cc:184] Garbage collection for extensions on file thread is complete.
+[15940:26880:1005/172703.339:ERROR:google_apis\gcm\engine\registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 559079338
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 733108593
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1104477328
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1235441726
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1398109417
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1745445570
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 2629264519
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 2928374096
+[6376:7052:1005/172711.653:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 3162947791
+[6376:7052:1005/172711.654:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 3189316647
+[15940:20408:1005/172711.695:INFO:CONSOLE:0] "Refused to execute script from 'https://clientes.celsia.com/clientes/cordova.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.", source: https://clientes.celsia.com/clientes/paga-tus-facturas (0)
+[15940:20408:1005/172711.696:INFO:CONSOLE:47] "MATOMO ::  ", source: https://clientes.celsia.com/clientes/paga-tus-facturas (47)
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 559079338
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 733108593
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1104477328
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1235441726
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1398109417
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1745445570
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 2629264519
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 2928374096
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 3162947791
+[6376:7052:1005/172711.761:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 3189316647
+[15940:20408:1005/172712.025:INFO:CONSOLE:2] "[DEPRECATION][Events]: The Events provider is deprecated and it will be removed in the next major release.
+  - Use "Observables" for a similar pub/sub architecture: https://angular.io/guide/observables
+  - Use "Redux" for advanced state management: https://ngrx.io", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.029:INFO:CONSOLE:2] "Usuario Logueado => [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.029:INFO:CONSOLE:2] "Validando la campaña...", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.076:INFO:CONSOLE:2] "Angular is running in the development mode. Call enableProdMode() to enable the production mode.", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.078:INFO:CONSOLE:2] "Native: tried calling StatusBar.styleDefault, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.079:INFO:CONSOLE:2] "Native: tried calling SplashScreen.hide, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.079:INFO:CONSOLE:2] "Native: tried calling CodePush.checkForUpdate, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.082:INFO:CONSOLE:2] "Native: tried calling CodePush.sync, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.082:INFO:CONSOLE:2] "error::  cordova_not_available", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.584:INFO:CONSOLE:2] "ERROR TypeError: av.shift is not a function", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.598:INFO:CONSOLE:2] "https://clientesqa.celsia.com/QAApp/trafficinternal/Surveys/listQuestionsByPage", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.598:INFO:CONSOLE:2] "header =>  [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.599:INFO:CONSOLE:2] "obj  {"page":"CONSULTAR_FACTURA"}", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.649:INFO:CONSOLE:2] "APPCOMPONENT SERVER RESPONSE...  [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.649:INFO:CONSOLE:2] "CAMPAÑA ::  null", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172712.703:INFO:CONSOLE:314] "Google Maps JavaScript API has been loaded directly without loading=async. This can result in suboptimal performance. For best-practice loading patterns please see https://goo.gle/js-api-loading", source: https://maps.googleapis.com/maps/api/js?key=AIzaSyBMORYb-k1BCCl2jWBvGqL9BAcp4TGKFlg (314)
+[15940:20408:1005/172713.891:INFO:CONSOLE:0] "An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.", source: https://www.google.com/recaptcha/api2/anchor?ar=1&k=6LfmDp8rAAAAAP0j_tiF4nXoClm1uN3LfCqHEqAj&co=aHR0cHM6Ly9jbGllbnRlcy5jZWxzaWEuY29tOjQ0Mw..&hl=es-419&type=image&v=Jv8jlA-BQE5JD6rA-h_iqNH2&theme=light&size=normal&anchor-ms=20000&execute-ms=15000&cb=yyq3oi7zc5 (0)
+[15940:20408:1005/172714.927:INFO:CONSOLE:0] "<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">", source: https://clientes.celsia.com/clientes/paga-tus-facturas (0)
+[15940:20408:1005/172715.084:INFO:CONSOLE:0] "Refused to execute script from 'https://clientes.celsia.com/clientes/cordova.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.", source: https://clientes.celsia.com/clientes/paga-tus-facturas (0)
+[15940:20408:1005/172715.085:INFO:CONSOLE:47] "MATOMO ::  ", source: https://clientes.celsia.com/clientes/paga-tus-facturas (47)
+[15940:20408:1005/172715.363:INFO:CONSOLE:2] "[DEPRECATION][Events]: The Events provider is deprecated and it will be removed in the next major release.
+  - Use "Observables" for a similar pub/sub architecture: https://angular.io/guide/observables
+  - Use "Redux" for advanced state management: https://ngrx.io", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172715.374:INFO:CONSOLE:2] "Usuario Logueado => [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172715.374:INFO:CONSOLE:2] "Validando la campaña...", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172715.453:INFO:CONSOLE:2] "Angular is running in the development mode. Call enableProdMode() to enable the production mode.", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172715.455:INFO:CONSOLE:2] "Native: tried calling StatusBar.styleDefault, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172715.455:INFO:CONSOLE:2] "Native: tried calling SplashScreen.hide, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172715.455:INFO:CONSOLE:2] "Native: tried calling CodePush.checkForUpdate, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172715.455:INFO:CONSOLE:2] "Native: tried calling CodePush.sync, but Cordova is not available. Make sure to include cordova.js or run in a device/simulator", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172715.455:INFO:CONSOLE:2] "error::  cordova_not_available", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172716.316:INFO:CONSOLE:2] "ERROR TypeError: av.shift is not a function", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172716.323:INFO:CONSOLE:2] "https://clientesqa.celsia.com/QAApp/trafficinternal/Surveys/listQuestionsByPage", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172716.323:INFO:CONSOLE:2] "header =>  [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172716.323:INFO:CONSOLE:2] "obj  {"page":"CONSULTAR_FACTURA"}", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172716.348:INFO:CONSOLE:314] "Google Maps JavaScript API has been loaded directly without loading=async. This can result in suboptimal performance. For best-practice loading patterns please see https://goo.gle/js-api-loading", source: https://maps.googleapis.com/maps/api/js?key=AIzaSyBMORYb-k1BCCl2jWBvGqL9BAcp4TGKFlg (314)
+[15940:20408:1005/172716.385:INFO:CONSOLE:2] "APPCOMPONENT SERVER RESPONSE...  [object Object]", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172716.388:INFO:CONSOLE:2] "CAMPAÑA ::  null", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172716.686:INFO:CONSOLE:0] "An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.", source: https://www.google.com/recaptcha/api2/anchor?ar=1&k=6LfmDp8rAAAAAP0j_tiF4nXoClm1uN3LfCqHEqAj&co=aHR0cHM6Ly9jbGllbnRlcy5jZWxzaWEuY29tOjQ0Mw..&hl=es-419&type=image&v=Jv8jlA-BQE5JD6rA-h_iqNH2&theme=light&size=normal&anchor-ms=20000&execute-ms=15000&cb=l9ecbzlmrarj (0)
+[15940:20408:1005/172716.983:INFO:CONSOLE:0] "<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">", source: https://clientes.celsia.com/clientes/paga-tus-facturas (0)
+[15940:20408:1005/172717.600:INFO:CONSOLE:0] "An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.", source: https://www.google.com/recaptcha/api2/bframe?hl=es-419&v=Jv8jlA-BQE5JD6rA-h_iqNH2&k=6LfmDp8rAAAAAP0j_tiF4nXoClm1uN3LfCqHEqAj&bft=0dAFcWeA4NKgCQRNyKaPzRCfcTpP-WLEmCSX9rJ2IBm0hWOUVkUXzvxnduep6MuLNqR_g1KR3gylkhiK7IX2BU31xjAqDQrV5jFg (0)
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 559079338
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 733108593
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1104477328
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1235441726
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1398109417
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1745445570
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 2629264519
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 2928374096
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 3162947791
+[6376:7052:1005/172717.672:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 3189316647
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 559079338
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 733108593
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1104477328
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1235441726
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1398109417
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 1745445570
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 2629264519
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 2928374096
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 3162947791
+[6376:7052:1005/172717.928:WARNING:cc\paint\skottie_wrapper_impl.cc:130] Encountered unknown property node with hash: 3189316647
+[15940:20408:1005/172728.797:INFO:CONSOLE:1] "[object Window]", source: https://clientes.celsia.com/clientes/common.b883d2ce40d1382184cc.js (1)
+[15940:20408:1005/172728.803:INFO:CONSOLE:1] "[object Object]", source: https://clientes.celsia.com/clientes/common.b883d2ce40d1382184cc.js (1)
+[15940:20408:1005/172728.806:INFO:CONSOLE:2] "Log accion consulta tus facturas - Verificar código de cuenta", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172728.810:INFO:CONSOLE:1] "TOKEN RECAPTCHA GENERATED:  0cAFcWeA6UZvDrv50FSyWHvVvLhTAgQV6T5jbRAu0sxWoUMFkTX6B0M1t0m3MpE6vUWoAJUOph6so-KuIfF-JVMC65btsE_rdXbgUjaGxrnIDWgKfmVsH159woPfA6FwS-ydzeq7ObXgfj2okIeRtsnianS6aH_d1e-N6Poloe7L9AjSa8rtY7dI-yfG6XOUK1W2LWD1Qu_WuLlfbVyo1t52Li34t-PmsvBWLZn0d0NYJRCL45W2Dc5JQY1qG62dPIBwuXnN4DrGz6h2Q5Av8106vtO7vEW4ckGuGomkewlXXDzEo2L-NLXcAzNODAY_c8lAfuOwBVxSSlPhDwy_R_zMZ4rMowZH8V_G7bSAsyFD-c_X8rDnwA7YNWGnCDPyA4kjYwwSx92tfYYMBccBApHcxeKubGlLIRni7whPT9HBQhxe23WODovS_x767ygMYq0kvtpbpLNx0L7J-PDerYurXJ15k0ZwoQ6njKuev3Uwt7u5QBTt6rBjklYhrvyqS8NaUdVa41BFGMMmy1_O609A3TEztznP_BAG1t0TZ2z5lkuMHjAfm5d9aMZBrHdF1cDwy628J_fhHshUxA9G8JVwnrGwv3G4OeUjeD_zWn-NtLx1MOuKOx2TvlXTQ3F0Le14nzqma-7mzdbvdTyd6rHR20g_YZwpbdg79v5znf3aQh08yYuodj5lOQbUeMMYXT-V7w0vjk-J6hbQfKEoFXfJ1lD35lbPEtc8GBZOAuRrip0kjY_SdEVFgrDaEg8ZausYcMYF-LICYB6D5kZdJT0h9GhEptLulJX5XGjFwpy2-tWEfobSiZileaAoxgZvwku_9-wHH5B3V3KiWKrWA2WT1SSm_u7kqh4hhPQGKYDw0qUBhHESJVtECINUUW1cpd9EqFVV05tPcJhZ0UPbeWfzbeWGDFjPqf7R_xBYudNE-LkNm0d0NYpZcc7obUA3G8Ib8d7QQSi5Z80xY6pFN9c_G_FfLq1tFv_nF2yZtAqNZjXmF304gFXd_q80wZLn3cmZwGkNmKFhXOIFNfbBSDnohrHQtNklOqBrkhWQtNfxXhPdy2rI1NSqRefL2I6YPR6bQ74ZGdrgHmmKJnvMD0_vlisC06dtv4YR6Dlhk_9r9R7bNsdeaMIR93tK8rwqj5mAcxxctIjozwP4RUPNr8l9-r9yaZQ5-KDuCYoUxc-gdADg1_2zQsutyFBx-ec4ekT8M1z8LSHm2bK0Nlh4FaSHM91KaQdPtS2PYdpNSCW1nJ7qqwd06iIedTUlWNxFvvPeF70pLb1x2Ts2H-G_E9c06NhCFIN2x_YMQ19n2dR54WQPbcySC8NqHH788MJGUznDb6ljAuk8MiNdXn9M4wdr8WujPGRzLmPVDMXsOEGO07vvx8aYiLam4cMs7AM3VokNMIH5hyBsAWJrvZLzcUtTjeJdBWYJFiC7LEnm8o2bJnV1Hc_l_OIg-8JgDu39j-lAVkoZ5WaeJguSz1aLbKdWGQp7VMbd5r0zFa14Wev9BO4u5_8DGVtM49KRA4uDx-InKnsIGx9AGI_eFDlYlXeuHRYm6ZhwO3_jaBsr5UG3mkEA55G1Xl8q_OusOHP2V1X7d33XRShULclZEOOcGxaVb7cdP8uP0I2A", source: https://clientes.celsia.com/clientes/24.02e0a52145bc70d4df74.js (1)
+[15940:20408:1005/172729.488:INFO:CONSOLE:2] "top", source: https://clientes.celsia.com/clientes/main.5d2ad303bc44d8094be3.js (2)
+[15940:20408:1005/172729.657:INFO:CONSOLE:0] "An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.", source: https://www.google.com/recaptcha/api2/anchor?ar=1&k=6LfmDp8rAAAAAP0j_tiF4nXoClm1uN3LfCqHEqAj&co=aHR0cHM6Ly9jbGllbnRlcy5jZWxzaWEuY29tOjQ0Mw..&hl=es-419&type=image&v=Jv8jlA-BQE5JD6rA-h_iqNH2&theme=light&size=normal&anchor-ms=20000&execute-ms=15000&cb=aphszzumibv3 (0)
+[19960:2984:1005/172730.346:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[19960:2984:1005/172730.346:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
