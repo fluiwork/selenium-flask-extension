@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     libgbm1 \
-    libpango1.0-0 \
+    libpango-1.0-0 \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
