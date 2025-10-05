@@ -1,13 +1,19 @@
-# Base image Python 3.13 slim
+# Base image
 FROM python:3.13-slim
 
-# ⚡ Instalar dependencias del sistema y xvfb
+# Variables de entorno para headless y puerto
+ENV PORT=10000
+ENV DISPLAY=:99
+
+# Instalar dependencias del sistema y Xvfb
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
     unzip \
     xvfb \
     xauth \
+    gnupg \
+    ca-certificates \
     libnss3 \
     libxss1 \
     libappindicator3-1 \
@@ -21,31 +27,27 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     libgbm1 \
     libpango-1.0-0 \
-    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# ⚡ Instalar Google Chrome estable
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
- && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+# Instalar Google Chrome estable sin apt-key
+RUN wget -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
  && apt-get update \
- && apt-get install -y google-chrome-stable \
+ && apt-get install -y /tmp/google-chrome-stable_current_amd64.deb \
+ && rm /tmp/google-chrome-stable_current_amd64.deb \
  && rm -rf /var/lib/apt/lists/*
 
-# ⚡ Crear directorio de la app
+# Crear directorio de la app
 WORKDIR /app
 
-# ⚡ Copiar requirements
+# Copiar requirements y instalar dependencias Python
 COPY requirements.txt .
-
-# ⚡ Instalar dependencias Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ⚡ Copiar el resto de la app
+# Copiar la app
 COPY . .
 
-# ⚡ Exponer el puerto (Render asigna PORT automáticamente)
-ENV PORT=10000
+# Exponer puerto
 EXPOSE $PORT
 
-# ⚡ Comando para Render
+# Comando para Render
 CMD ["xvfb-run", "-a", "python3", "selenium_flask_app.py"]
