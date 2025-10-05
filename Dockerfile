@@ -47,7 +47,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Exponer puerto
-EXPOSE $PORT
+EXPOSE 5000
 
 # Comando para Render
 CMD ["xvfb-run", "-a", "python3", "selenium_flask_app.py"]
