@@ -55,4 +55,5 @@ COPY . .
 EXPOSE $PORT
 
 # Comando de inicio
-CMD ["xvfb-run", "-a", "python3", "selenium_flask_app.py"]
+CMD ["python3", "selenium_flask_app.py"]
+
