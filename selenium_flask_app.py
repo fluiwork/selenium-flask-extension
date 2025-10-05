@@ -36,26 +36,17 @@ except Exception:
     pass
 
 # -------------------------
-# Logging CONCISO
+# Logging
 # -------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%H:%M:%S'
-)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
-
-# Silenciar logs verbose de librerías
-logging.getLogger('selenium').setLevel(logging.WARNING)
-logging.getLogger('urllib3').setLevel(logging.WARNING)
-logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 app = Flask(__name__)
 
 # -------------------------
 # CONFIG (ajusta aquí)
 # -------------------------
-VISIBLE = True   # <-- PONER True para ver el navegador / False para headless
+VISIBLE = False   # <-- CAMBIADO A False para headless con Xvfb
 LOGIN_URL = "https://clientes.celsia.com/clientes/login"
 TARGET_URL = "https://clientes.celsia.com/clientes/paga-tus-facturas"
 
@@ -166,9 +157,8 @@ def save_cookies_to_file(driver, path=COOKIES_FILE):
         cookies = driver.get_cookies()
         with open(path, "w", encoding="utf-8") as f:
             json.dump(cookies, f)
-        logger.info("Cookies guardadas")
     except Exception:
-        logger.error("Error guardando cookies")
+        logger.exception("[!] Error guardando cookies:")
 
 def load_cookies_from_file(path=COOKIES_FILE):
     if not path.exists():
@@ -177,7 +167,7 @@ def load_cookies_from_file(path=COOKIES_FILE):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
-        logger.error("Error cargando cookies")
+        logger.exception("[!] Error cargando cookies:")
         return None
 
 
@@ -205,20 +195,20 @@ def perform_login(driver,
                   submit_selector,
                   post_login_check_selector,
                   wait_timeout=ELEMENT_WAIT_TIMEOUT):
-    logger.info("Iniciando proceso de login...")
+    logger.debug("[*] Realizando login (robusto, flujo único - iframe 'loginunico') ...")
     try:
         try:
             driver.get(login_url)
         except Exception:
-            logger.error("Error navegando a login URL")
+            logger.exception("[!] driver.get(login_url) fallo, prosigo con intentos.")
 
         try:
             WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
         except Exception:
-            logger.warning("Página no cargada completamente")
+            logger.debug("[*] Advertencia: readyState no llegó a 'complete' en 10s (continúa)")
 
         frames = driver.find_elements(By.TAG_NAME, "iframe")
-        logger.info(f"Iframes detectados: {len(frames)}")
+        logger.debug("[*] Iframes detectados: %d", len(frames))
         chosen_frame = None
         for idx, fr in enumerate(frames):
             try:
@@ -226,7 +216,7 @@ def perform_login(driver,
                 low = src.lower()
                 if "loginunico" in low or "azurewebsites" in low or "loginunico-prd" in low:
                     chosen_frame = fr
-                    logger.info(f"Iframe login encontrado: {src}")
+                    logger.debug("[*] Elegido iframe[%d] para login (src=%s)", idx, src)
                     break
             except Exception:
                 pass
@@ -238,7 +228,7 @@ def perform_login(driver,
                     inputs_in_frame = driver.find_elements(By.TAG_NAME, "input")
                     if inputs_in_frame and len(inputs_in_frame) >= 1:
                         chosen_frame = fr
-                        logger.info("Iframe seleccionado por heurística")
+                        logger.debug("[*] Elegido iframe[%d] por heurística (tiene inputs).", idx)
                     driver.switch_to.default_content()
                     if chosen_frame:
                         break
@@ -249,18 +239,17 @@ def perform_login(driver,
                         pass
 
         if not chosen_frame:
-            logger.error("No se encontró iframe de login")
+            logger.error("[ERROR] No se encontró iframe de login adecuado.")
             return False
 
         try:
             driver.switch_to.frame(chosen_frame)
-            logger.info("Dentro del iframe de login")
+            logger.debug("[*] Dentro del iframe elegido, buscando campos de usuario/clave")
 
             by_u, sel_u = resolve_locator(username_selector)
             by_p, sel_p = resolve_locator(password_selector)
             user_el = None
             pass_el = None
-            
             try:
                 els_u = driver.find_elements(by_u, sel_u)
                 if els_u:
@@ -296,14 +285,14 @@ def perform_login(driver,
                         pass
 
             if not user_el or not pass_el:
-                logger.error("No se encontraron campos de login")
+                logger.error("[!] No se localizaron campos de login dentro del iframe seleccionado.")
                 driver.switch_to.default_content()
                 return False
 
             USER = os.environ.get("MI_SITIO_USER")
             PASS = os.environ.get("MI_SITIO_PASS")
             if not USER or not PASS:
-                logger.error("Credenciales no configuradas")
+                logger.error("[!] Credenciales no configuradas en variables de entorno.")
                 driver.switch_to.default_content()
                 return False
 
@@ -339,32 +328,33 @@ def perform_login(driver,
                         except Exception:
                             pass
             except Exception:
-                logger.error("Error en submit")
+                logger.exception("[!] Error intentando submit dentro del iframe:")
 
             driver.switch_to.default_content()
 
             if not submitted:
-                logger.warning("No se pudo enviar formulario")
+                logger.warning("[!] No se pudo pulsar submit dentro del iframe.")
                 return False
 
             try:
                 by_check, sel_check = resolve_locator(post_login_check_selector)
                 WebDriverWait(driver, wait_timeout).until(EC.presence_of_element_located((by_check, sel_check)))
-                logger.info("Login exitoso")
+                logger.debug("[+] Login confirmado en document principal tras submit en iframe")
+                # --- Navegar inmediatamente al TARGET_URL para evitar quedarse en la página intermedia ---
                 try:
                     driver.get(TARGET_URL)
                     WebDriverWait(driver, 6).until(lambda d: d.execute_script("return document.readyState") == "complete")
-                    logger.info("Redirigido a URL objetivo")
+                    logger.debug("[*] Redirigido a TARGET_URL inmediatamente tras login")
                 except Exception:
-                    logger.warning("No se pudo redirigir inmediatamente")
+                    logger.debug("[*] No se pudo redirigir inmediatamente a TARGET_URL o la carga fue lenta, el flujo continuará normalmente.")
                 save_cookies_to_file(driver)
                 return True
             except Exception:
-                logger.error("No se confirmó login exitoso")
+                logger.warning("[!] No se detectó post-login tras submit en iframe (posible fallo).")
                 return False
 
         except Exception:
-            logger.error("Error en proceso de login")
+            logger.exception("[!] Error dentro del iframe durante login:")
             try:
                 driver.switch_to.default_content()
             except Exception:
@@ -372,7 +362,7 @@ def perform_login(driver,
             return False
 
     except Exception:
-        logger.error("Fallo general en login")
+        logger.exception("[!] perform_login fallo inesperado:")
         return False
 
 
@@ -384,6 +374,7 @@ def ensure_logged_in(driver,
                      submit_selector,
                      post_login_check_selector,
                      wait_timeout=ELEMENT_WAIT_TIMEOUT):
+    # Intentamos abrir la página de login directamente (no se usa BASE_URL ya)
     try:
         driver.get(login_url)
     except Exception:
@@ -391,7 +382,7 @@ def ensure_logged_in(driver,
 
     cookies = load_cookies_from_file()
     if cookies:
-        logger.info("Cargando cookies...")
+        logger.debug("[*] Cargando cookies desde disco...")
         for c in cookies:
             try:
                 if 'name' in c and 'value' in c:
@@ -413,16 +404,17 @@ def ensure_logged_in(driver,
         try:
             by_check, sel_check = resolve_locator(post_login_check_selector)
             WebDriverWait(driver, 3).until(EC.presence_of_element_located((by_check, sel_check)))
-            logger.info("Sesión restaurada con cookies")
+            logger.debug("[+] Sesión restaurada con cookies")
+            # si sesión válida, navegar de inmediato al TARGET_URL
             try:
                 driver.get(TARGET_URL)
                 WebDriverWait(driver, 6).until(lambda d: d.execute_script("return document.readyState") == "complete")
-                logger.info("Redirigido a URL objetivo")
+                logger.debug("[*] Redirigido a TARGET_URL tras restaurar cookies")
             except Exception:
-                logger.warning("No se pudo redirigir tras restaurar cookies")
+                logger.debug("[*] No se pudo redirigir inmediatamente a TARGET_URL tras restaurar cookies.")
             return True
         except Exception:
-            logger.warning("Cookies inválidas, login requerido")
+            logger.debug("[*] Cookies no válidas o sesión expirada, se hará login")
 
     ok = perform_login(driver,
                   login_url,
@@ -434,7 +426,7 @@ def ensure_logged_in(driver,
     if ok:
         return True
     else:
-        logger.warning("Login automático falló")
+        logger.warning("[!] No se pudo iniciar sesión automáticamente (perform_login devolvió False). El flujo continuará intentando acceder a la página objetivo y reintentando login si es necesario.")
         return False
 
 # -------------------------
@@ -445,16 +437,22 @@ def accept_terms_if_present(driver,
                             checkbox_input_xpath=TERMS_CHECKBOX_INPUT,
                             accept_button_selector=TERMS_ACCEPT_BUTTON_SELECTOR,
                             wait_timeout=2):
-    logger.info("Procesando términos y condiciones...")
+    """
+    Versión rápida para marcar checkbox normales.
+    wait_timeout por defecto reducido a 2s para acelerar el intento.
+    """
+    logger.debug("[*] Buscando checkbox de términos y condiciones (fast mode)...")
     
     try:
-        logger.info("Intentando marcar checkbox...")
+        # PRIMERO: Intentar con el selector principal del input
+        logger.debug(f"[*] Intentando con selector principal: {checkbox_input_xpath}")
         by_input, sel_input = resolve_locator(checkbox_input_xpath)
         
         try:
             checkbox_input = WebDriverWait(driver, max(1, wait_timeout)).until(
                 EC.presence_of_element_located((by_input, sel_input))
             )
+            # intentar marcar inmediatamente por JS
             try:
                 driver.execute_script("if(!arguments[0].checked){arguments[0].click();}", checkbox_input)
             except Exception:
@@ -463,15 +461,18 @@ def accept_terms_if_present(driver,
                 except Exception:
                     pass
 
+            # pequeña comprobación inmediata
             try:
                 if checkbox_input.is_selected():
-                    logger.info("Checkbox marcado")
+                    logger.debug("[+] Checkbox marcado (fast path)")
                     return True
             except Exception:
                 pass
         except Exception as e:
-            logger.warning(f"No se pudo marcar checkbox: {e}")
+            logger.debug(f"[!] No se pudo encontrar/marcar con selector principal (fast): {e}")
 
+        # SEGUNDO: Intentar con el selector del label/container
+        logger.debug(f"[*] Intentando con selector del label: {checkbox_selector}")
         by_label, sel_label = resolve_locator(checkbox_selector)
         
         try:
@@ -486,17 +487,19 @@ def accept_terms_if_present(driver,
                 except Exception:
                     pass
             time.sleep(0.15)
-            logger.info("Checkbox marcado vía label")
+            logger.debug("[+] Click realizado en el label del checkbox (fast path)")
             return True
             
         except Exception as e:
-            logger.warning(f"No se pudo marcar label: {e}")
+            logger.debug(f"[!] No se pudo encontrar/marcar con selector del label (fast): {e}")
 
-        logger.info("Buscando checkbox alternativo...")
+        # TERCERO: búsqueda rápida de cualquier checkbox visible
+        logger.debug("[*] Buscando cualquier checkbox en la página (fast fallback)...")
         try:
             checkboxes = driver.find_elements(By.CSS_SELECTOR, 'input[type="checkbox"]')
         except Exception:
             checkboxes = []
+        logger.debug(f"[*] Se encontraron {len(checkboxes)} checkboxes en total (fast fallback)")
         
         for i, checkbox in enumerate(checkboxes):
             try:
@@ -509,34 +512,40 @@ def accept_terms_if_present(driver,
                                 checkbox.click()
                             except Exception:
                                 pass
-                        logger.info("Checkbox alternativo marcado")
+                        logger.debug(f"[+] Checkbox alternativo {i+1} marcado (fast fallback)")
                         return True
-            except Exception:
+            except Exception as e:
+                logger.debug(f"[!] Error con checkbox alternativo {i+1}: {e}")
                 continue
 
-        logger.error("No se pudo marcar ningún checkbox")
+        logger.error("[!] No se pudo encontrar ni marcar ningún checkbox de términos (fast finish)")
         return False
 
-    except Exception:
-        logger.error("Error en aceptación de términos")
+    except Exception as e:
+        logger.exception("[!] Error inesperado en accept_terms_if_present (fast mode):")
         return False
 
 def ensure_checkbox_checked(driver, checkbox_input_xpath=TERMS_CHECKBOX_INPUT, retries=3, delay=1):
+    """
+    Versión simplificada - solo verifica si está marcado
+    """
     for attempt in range(retries):
         try:
             by_i, sel_i = resolve_locator(checkbox_input_xpath)
             checkbox = driver.find_element(by_i, sel_i)
             
             if checkbox.is_selected():
-                logger.info("Checkbox verificado")
+                logger.debug(f"[+] Checkbox verificado como marcado (intento {attempt+1})")
                 return True
             else:
+                logger.debug(f"[*] Checkbox aún no marcado (intento {attempt+1})")
                 time.sleep(delay)
                 
-        except Exception:
+        except Exception as e:
+            logger.debug(f"[!] Error verificando checkbox (intento {attempt+1}): {e}")
             time.sleep(delay)
     
-    logger.error("Checkbox no verificado")
+    logger.error("[!] Checkbox no pudo ser verificado como marcado después de intentos")
     return False
 
 # -------------------------
@@ -548,6 +557,7 @@ def set_input_value(driver, input_el, value):
             input_el.clear()
         except Exception:
             pass
+        # Simular escritura humana
         for char in value:
             input_el.send_keys(char)
             time.sleep(random.uniform(0.05, 0.1))
@@ -595,14 +605,14 @@ def find_and_fill_input_with_candidates(driver, valor, wait_timeout):
                                 if el.is_displayed():
                                     ok = set_input_value(driver, el, valor)
                                     if ok:
-                                        logger.info("Input llenado exitosamente")
+                                        logger.debug("[+] Valor puesto en input por selector: %s", sel)
                                         return True
                             except Exception:
                                 try:
                                     driver.execute_script("arguments[0].scrollIntoView(true);", el)
                                     ok = set_input_value(driver, el, valor)
                                     if ok:
-                                        logger.info("Input llenado después de scroll")
+                                        logger.debug("[+] Valor puesto en input por selector (after scroll): %s", sel)
                                         return True
                                 except Exception:
                                     pass
@@ -616,7 +626,7 @@ def find_and_fill_input_with_candidates(driver, valor, wait_timeout):
                         if "codigo" in ph or "cuenta" in ph or "ingresa" in ph:
                             ok = set_input_value(driver, inp, valor)
                             if ok:
-                                logger.info("Input encontrado por placeholder")
+                                logger.debug("[+] Valor puesto en input por heurística placeholder")
                                 return True
                     except Exception:
                         pass
@@ -626,13 +636,19 @@ def find_and_fill_input_with_candidates(driver, valor, wait_timeout):
             last_exception = e
         time.sleep(0.8)
     if last_exception:
-        logger.error("Error buscando input")
+        logger.exception("[!] find_and_fill_input_with_candidates: última excepción:")
     return False
 
 # -------------------------
-# Validación de estructura deseada en el texto extraído
+# NUEVO: validación de estructura deseada en el texto extraído
 # -------------------------
 def has_desired_structure(text):
+    """
+    Verifica que el texto contenga una estructura similar a:
+      Código de cuenta: <digits>
+      ...
+      Pago total: $<cantidad>
+    """
     if not text or not isinstance(text, str):
         return False
     lines = [l.strip() for l in text.splitlines() if l.strip()]
@@ -693,7 +709,8 @@ def run_selenium_task(valor,
                       post_login_check_selector=POST_LOGIN_CHECK_SELECTOR,
                       wait_timeout=ELEMENT_WAIT_TIMEOUT):
     
-    # Verificar Xvfb
+    # Iniciar Xvfb para entorno headless
+    display = None
     display_var = os.environ.get('DISPLAY')
     if not VISIBLE and not display_var:
         logger.info("Iniciando Xvfb para entorno headless...")
@@ -707,33 +724,40 @@ def run_selenium_task(valor,
 
     chrome_options = Options()
 
+    # --- Use an existing Chrome user-data-dir and Profile 2 ---
     try:
-        default_user_data = os.environ.get("EXT_USER_DATA_DIR", "/data/chrome_profile")
+        # Allow override via environment variable EXT_USER_DATA_DIR.
+        default_user_data = r"C:\Users\ASUS\Desktop\Borradores\chrome_profile_copy"
         user_data_dir = os.environ.get("EXT_USER_DATA_DIR", default_user_data)
 
+        # Add the user-data-dir argument (points to the Chrome "User Data" or the folder we copied)
         if Path(user_data_dir).exists():
             chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+            # Explicitly select the profile folder "Profile 2"
             chrome_options.add_argument(f'--profile-directory=Profile 2')
-            logger.info("Perfil de Chrome configurado")
+            logger.debug(f"[*] Configured Chrome to use user-data-dir={user_data_dir} and profile=Profile 2")
         else:
-            logger.warning("Directorio de perfil no encontrado")
+            logger.warning(f"[*] EXT_USER_DATA_DIR not found or does not exist: {user_data_dir}. Chrome will start with a fresh profile.")
     except Exception:
-        logger.error("Error configurando perfil")
+        logger.exception("[!] Error intentando configurar user-data-dir/profile-directory:")
 
+    # Añadido: detach para mantener navegador si se quiere (como en tu snippet)
     chrome_options.add_experimental_option("detach", True)
 
-    if os.environ.get("FORCE_HEADLESS", "0") == "1":
-        chrome_options.add_argument("--headless=new")
-        logger.info("Modo headless forzado")
-
+    # Eliminado: --headless=new ya que usamos Xvfb
+    # if not VISIBLE:
+    #    chrome_options.add_argument('--headless=new')
+    
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     
+    # Configuraciones avanzadas para evitar detección
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
+    # NOTE: no se añade '--disable-extensions' para permitir que la extensión instalada en el perfil funcione
     chrome_options.add_argument('--no-first-run')
     chrome_options.add_argument('--no-default-browser-check')
     chrome_options.add_argument('--disable-web-security')
@@ -751,21 +775,22 @@ def run_selenium_task(valor,
     service = Service(ChromeDriverManager().install())
     driver = None
     try:
-        logger.info("Iniciando Chrome...")
-        driver = webdriver.Chrome(options=chrome_options)
+        logger.debug("[*] Lanzando Chrome (visible=" + str(VISIBLE) + ") ...")
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         
+        # Ejecutar script para eliminar webdriver property (no fatal si falla)
         try:
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         except Exception:
             pass
-
+        
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
 
         USER = os.environ.get("MI_SITIO_USER")
         PASS = os.environ.get("MI_SITIO_PASS")
         if not USER or not PASS:
-            error_msg = 'Credenciales no configuradas'
-            logger.error(error_msg)
+            error_msg = 'No hay credenciales en variables de entorno. Configura MI_SITIO_USER y MI_SITIO_PASS.'
+            logger.error("[ERROR] " + error_msg)
             return {'success': False, 'error': error_msg}
 
         logged = False
@@ -779,14 +804,15 @@ def run_selenium_task(valor,
                              post_login_check_selector=post_login_check_selector,
                              wait_timeout=wait_timeout)
         except Exception:
-            logger.error("Error en ensure_logged_in")
+            logger.exception("[!] ensure_logged_in threw:")
 
+        # Force navigation to target_url again if not already there (defensive)
         try:
             driver.get(target_url)
         except Exception:
             pass
 
-        logger.info("Navegando a URL objetivo...")
+        logger.debug("[*] Navegando a target_url (asegurado tras login intento): %s", target_url)
         try:
             driver.get(target_url)
         except Exception:
@@ -797,9 +823,10 @@ def run_selenium_task(valor,
             current = driver.current_url or ""
         except Exception:
             current = ""
+        logger.debug("[*] URL actual tras navegación: %s", current)
 
         if 'login' in current.lower() or 'auth' in current.lower() or (not logged and ('clientes' in current and 'paga-tus-facturas' not in current)):
-            logger.info("Reintentando login...")
+            logger.debug("[*] Detectada redirección a login o no estamos logueados; reintentando login y luego navegando al target_url.")
             try:
                 perform_login(driver,
                               login_url,
@@ -809,20 +836,30 @@ def run_selenium_task(valor,
                               post_login_check_selector,
                               wait_timeout=wait_timeout)
             except Exception:
-                logger.error("Error en reintento de login")
+                logger.exception("[!] perform_login lanzó excepción en reintento:")
             try:
                 driver.get(target_url)
             except Exception:
                 pass
             time.sleep(1.0)
+            try:
+                logger.debug("[*] URL actual tras reintento: %s", driver.current_url)
+            except Exception:
+                pass
 
-        logger.info("Buscando input...")
+        # 3) Esperar y localizar el input objetivo usando selectores alternativos/heurística
+        logger.debug("[*] Buscando/llenando input objetivo con reintentos (candidatos)...")
         found_and_filled = find_and_fill_input_with_candidates(driver, valor, wait_timeout= max(wait_timeout, 25))
         if not found_and_filled:
-            logger.error("No se pudo encontrar/llenar input")
+            logger.error("No se pudo localizar/llenar el input en la página objetivo. Revisa logs.")
             return {'success': False, 'error': 'No se pudo localizar/llenar el input en la página objetivo.'}
 
-        logger.info("Procesando términos...")
+        # -------------------------
+        # PRIMERO: CHECKBOX DE TÉRMINOS (fast)
+        # -------------------------
+        logger.debug("[*] Iniciando proceso automático de aceptación de términos (fast)...")
+
+        # Pasamos wait_timeout reducido al accept_terms_if_present para hacerlo más rápido
         accepted = accept_terms_if_present(driver,
                                 checkbox_selector=TERMS_CHECKBOX_SELECTOR,
                                 checkbox_input_xpath=TERMS_CHECKBOX_INPUT,
@@ -830,20 +867,25 @@ def run_selenium_task(valor,
                                 wait_timeout=2)
 
         if accepted:
-            logger.info("Términos aceptados")
+            logger.debug("[+] Checkbox de términos procesado correctamente (fast)")
+            # Verificar que quedó marcado con menos reintentos
             ensure_checkbox_checked(driver, checkbox_input_xpath=TERMS_CHECKBOX_INPUT, retries=2, delay=0.3)
         else:
-            logger.warning("No se pudieron aceptar términos automáticamente")
+            logger.warning("[!] No se pudo marcar el checkbox de términos automáticamente (fast)")
 
-        logger.info("Procesando botón...")
+        # 4) PULSADO DEL BOTÓN después de aceptar términos — detectar activación rápidamente
+        logger.debug("[*] Procediendo con el botón después de aceptar términos (fast-click)...")
         clicked_search = False
 
         if not MANUAL_INTERACTION:
+            # Esperar un poco después de aceptar términos
             time.sleep(0.4)
             
+            logger.debug("[*] Buscando botón a clickear: %s", button_selector)
             by_btn, sel_btn = resolve_locator(button_selector)
 
             try:
+                # Poll rápido hasta que el botón esté habilitado / clickable
                 def find_active_button(drv):
                     try:
                         el = drv.find_element(by_btn, sel_btn)
@@ -857,14 +899,17 @@ def run_selenium_task(valor,
                     except Exception:
                         return False
 
+                # Timeout corto y poll frecuente para ser reactivo
                 wait_btn = WebDriverWait(driver, 12, poll_frequency=0.2)
                 btn = wait_btn.until(find_active_button)
 
+                # Resaltar el botón si posible
                 try:
                     driver.execute_script("arguments[0].style.outline = '3px solid lime';", btn)
                 except Exception:
                     pass
 
+                # Click inmediato con JS (más rápido y confiable)
                 try:
                     driver.execute_script("arguments[0].click();", btn)
                 except Exception:
@@ -875,28 +920,30 @@ def run_selenium_task(valor,
                         try:
                             btn.click()
                         except Exception:
-                            logger.error("Error haciendo click en botón")
+                            logger.exception("[!] Intentos de click en botón fallaron")
 
                 clicked_search = True
-                logger.info("Botón clickeado exitosamente")      
+                logger.debug("[+] Click en botón de búsqueda realizado (fast-click).")
+                
             except Exception:
-                logger.error("No se pudo hacer click en botón")
+                logger.exception("[!] No se pudo hacer click automático en el botón (fast-click)")
         else:
-            logger.info("Esperando click manual")
+            logger.info("[MANUAL] Por favor haz click en el botón Consultar")
 
+        # ----------------- esperar resultado específico (xpath que proporcionaste) -----------------
         result_wait_timeout = max(wait_timeout, 45)
         if MANUAL_INTERACTION:
             result_wait_timeout = MANUAL_WAIT_TIMEOUT
 
-        logger.info("Esperando resultado...")
+        logger.debug("[*] Esperando selector de resultado exacto (robusto): %s", result_selector)
 
         try:
             WebDriverWait(driver, result_wait_timeout).until(
                 lambda d: d.find_elements(By.CSS_SELECTOR, "app-request-invoice") or d.find_elements(By.CSS_SELECTOR, "div.payment-card-invoice-info") or d.find_elements(By.TAG_NAME, "ion-grid")
             )
-            logger.info("Contenedor de resultado detectado")
+            logger.debug("[*] Se detectó contenedor de resultado (app-request-invoice / ion-grid / payment-card-invoice-info).")
         except Exception:
-            logger.warning("Contenedor no detectado, continuando...")
+            logger.debug("[*] No se detectó contenedor 'app-request-invoice' / 'ion-grid' en el tiempo esperado, continuar con búsqueda profunda...")
 
         _find_deep_js = """
 function findDeep(selector){
@@ -1021,40 +1068,56 @@ return findDeep(arguments[0]);
                         except Exception:
                             result_text = ""
 
-                    if has_desired_structure(result_text):
-                        logger.info("Resultado válido encontrado")
-                        try:
-                            driver.execute_script("arguments[0].style.outline = '4px solid red'; arguments[0].scrollIntoView({block:'center'});", found_el)
-                        except Exception:
-                            pass
-                        return {'success': True, 'result': result_text}
-                    else:
-                        found_el = None
+                    logger.debug("[*] Texto extraído (len): %d", len(result_text) if result_text else 0)
+
+                    try:
+                        if has_desired_structure(result_text):
+                            logger.debug("[+] Estructura deseada encontrada. Retornando resultado.")
+                            try:
+                                driver.execute_script("arguments[0].style.outline = '4px solid red'; arguments[0].scrollIntoView({block:'center'});", found_el)
+                            except Exception:
+                                pass
+                            logger.debug("[+] Resultado extraído (longitud): %d", len(result_text))
+                            return {'success': True, 'result': result_text}
+                        else:
+                            found_el = None
+                    except Exception:
+                        pass
             except Exception:
                 pass
             time.sleep(0.6)
 
-        logger.error("Resultado no encontrado")
+        logger.error("No se encontró el resultado con la estructura esperada dentro del tiempo")
         return {'success': False, 'error': 'No se encontró el resultado con la estructura esperada dentro del tiempo'}
 
     except TimeoutException as e:
-        logger.error(f"Timeout: {e}")
-        return {'success': False, 'error': f'Tiempo de espera excedido: {e}'}
+        tb = traceback.format_exc()
+        logger.exception("[ERROR] TimeoutException: %s", e)
+        return {'success': False, 'error': f'Tiempo de espera excedido: {e}', 'trace': tb}
     except WebDriverException as e:
-        logger.error(f"WebDriver error: {e}")
-        return {'success': False, 'error': f'Error de WebDriver: {e}'}
+        tb = traceback.format_exc()
+        logger.exception("[ERROR] WebDriverException: %s", e)
+        return {'success': False, 'error': f'Error de WebDriver: {e}', 'trace': tb}
     except Exception as e:
-        logger.error(f"Error general: {e}")
-        return {'success': False, 'error': str(e)}
+        tb = traceback.format_exc()
+        logger.exception("[ERROR] Exception: %s", e)
+        return {'success': False, 'error': str(e), 'trace': tb}
     finally:
         if driver:
             if VISIBLE:
+                logger.debug("[*] Depuración visible: el navegador permanecerá 1 segundo antes de cerrar.")
                 time.sleep(1)
             try:
                 driver.quit()
-                logger.info("Driver cerrado")
             except Exception:
                 pass
+        # Detener Xvfb si se inició
+        if display:
+            try:
+                display.stop()
+                logger.info("Xvfb detenido")
+            except Exception as e:
+                logger.error(f"Error deteniendo Xvfb: {e}")
 
 # -------------------------
 # Flask routes
@@ -1074,5 +1137,5 @@ def process():
     return jsonify(res)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    logger.info("Iniciando servidor Flask en http://127.0.0.1:5000")
+    app.run(host='127.0.0.1', port=5000, debug=True)
