@@ -1,78 +1,79 @@
-# =============================
-# 🔹 BASE: Python + Chrome + Selenium + Flask
-# =============================
-FROM python:3.11-slim
+# ==============================
+#  BASE: Python + Chrome + Xvfb
+# ==============================
+FROM python:3.13-slim
 
-# =============================
-# 🔹 Configuración inicial
-# =============================
-ENV DEBIAN_FRONTEND=noninteractive
-WORKDIR /app
+ENV PORT=10000
+ENV DISPLAY=:99
 
-# =============================
-# 🔹 Instalar dependencias del sistema
-# =============================
+# ==============================
+#  Dependencias del sistema
+# ==============================
 RUN apt-get update && apt-get install -y \
-    wget unzip curl gnupg xvfb \
-    fonts-liberation libappindicator3-1 libasound2 libatk-bridge2.0-0 libatk1.0-0 \
-    libcups2 libdbus-1-3 libgdk-pixbuf2.0-0 libnspr4 libnss3 libx11-xcb1 \
-    libxcomposite1 libxdamage1 libxrandr2 xdg-utils libu2f-udev \
-    libgbm1 libgtk-3-0 ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+    wget curl unzip xvfb xauth gnupg ca-certificates \
+    libnss3 libxss1 libappindicator3-1 fonts-liberation libasound2 \
+    libatk-bridge2.0-0 libgtk-3-0 libx11-xcb1 libxcomposite1 \
+    libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
-# =============================
-# 🔹 Instalar Google Chrome estable
-# =============================
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
-    > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && apt-get install -y google-chrome-stable && \
-    rm -rf /var/lib/apt/lists/*
+# ==============================
+#  Instalar Google Chrome estable
+# ==============================
+RUN wget -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+ && apt-get install -y /tmp/chrome.deb \
+ && rm /tmp/chrome.deb
 
-# =============================
-# 🔹 Instalar ChromeDriver estable (fix para Chrome 141)
-# =============================
-RUN DRIVER_VERSION=140.0.7247.0 && \
-    echo "Instalando ChromeDriver versión $DRIVER_VERSION" && \
-    wget -q -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/${DRIVER_VERSION}/linux64/chromedriver-linux64.zip" && \
-    unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
-    mv /usr/local/bin/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
-    chmod +x /usr/local/bin/chromedriver && \
+# ==============================
+#  Instalar ChromeDriver compatible
+# ==============================
+RUN set -eux; \
+    CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
+    DRIVER_VERSION=$(echo "$CHROME_VERSION" | cut -d'.' -f1-3) && \
+    echo "Detected Chrome version: $CHROME_VERSION (driver $DRIVER_VERSION)" && \
+    wget -q -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$DRIVER_VERSION/linux64/chromedriver-linux64.zip" || \
+    wget -q -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$CHROME_VERSION/linux64/chromedriver-linux64.zip" || \
+    wget -q -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$(echo $DRIVER_VERSION | cut -d'.' -f1)/linux64/chromedriver-linux64.zip"; \
+    unzip /tmp/chromedriver.zip -d /usr/local/bin/; \
+    mv /usr/local/bin/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver; \
+    chmod +x /usr/local/bin/chromedriver; \
     rm -rf /tmp/chromedriver.zip /usr/local/bin/chromedriver-linux64
 
-# =============================
-# 🔹 Instalar dependencias Python
-# =============================
+# ==============================
+#  App setup
+# ==============================
+WORKDIR /app
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# =============================
-# 🔹 Copiar el código de la app
-# =============================
+# Copiamos TODO el proyecto, incluyendo el perfil y la extensión
 COPY . .
 
-# =============================
-# 🔹 Variables y permisos
-# =============================
-ENV FLASK_ENV=production
-ENV PYTHONUNBUFFERED=1
+# ==============================
+#  Chrome Profile
+# ==============================
+# Si tu perfil está en chrome_profile_copy/Profile2
+# lo copiamos al lugar donde Chrome lo espera en Linux.
+RUN mkdir -p /root/.config/google-chrome/
+COPY chrome_profile_copy/Profile2 /root/.config/google-chrome/Default/
+RUN chmod -R 755 /root/.config/google-chrome/Default
 
-# =============================
-# 🔹 Crear carpeta para perfil de Chrome con extensión
-# =============================
-# Copia tu perfil exportado desde Linux (con extensión incluida)
-# Ejemplo: lo colocas en tu proyecto en /app/config/profile_linux/
-COPY config/profile_linux /root/.config/google-chrome/Default/
+# ==============================
+#  Permisos y entorno
+# ==============================
+RUN if [ -d "/app/chrome_profile_copy/Profile2" ]; then chmod -R 755 /app/chrome_profile_copy/Profile2; fi
 
-# Ajustar permisos
-RUN chmod -R 777 /root/.config/google-chrome
+# Variables opcionales para debug
+ENV EXT_USER_DATA_DIR=/app/chrome_profile_copy/Profile2
 
-# =============================
-# 🔹 Puerto Flask
-# =============================
-EXPOSE 5000
+# ==============================
+#  Selenium y WebDriver
+# ==============================
+RUN pip install --no-cache-dir selenium==4.15.0 webdriver-manager==3.8.6 || true
 
-# =============================
-# 🔹 Comando de ejecución
-# =============================
-CMD ["python", "selenium_flask_app.py"]
+# ==============================
+#  Exponer puerto y ejecutar
+# ==============================
+EXPOSE 10000
+
+CMD ["sh", "-c", "xvfb-run -a python3 selenium_flask_app.py"]
