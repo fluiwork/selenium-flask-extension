@@ -13,11 +13,12 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY . /app
 
-# 🔍 Paso de depuración: mostrar requirements.txt
-RUN echo "=== CONTENIDO DE requirements.txt ===" && cat requirements.txt
+# Crea y usa un entorno virtual para instalar dependencias
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# 🔍 Instalación con salida detallada
-RUN pip install --no-cache-dir -v -r requirements.txt
+RUN echo "=== CONTENIDO DE requirements.txt ===" && cat requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Expone el puerto del servidor Flask
 EXPOSE 5000
