@@ -2,9 +2,10 @@
 FROM python:3.13-slim
 
 # Variables de entorno
+ENV PORT=10000
 ENV DISPLAY=:99
 
-# Instalar dependencias del sistema y Xvfb
+# Instalar dependencias de sistema
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -35,18 +36,24 @@ RUN wget -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/li
  && rm /tmp/google-chrome-stable_current_amd64.deb \
  && rm -rf /var/lib/apt/lists/*
 
+# Descargar ChromeDriver que coincide con Chrome
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d '.' -f1) \
+ && echo "Chrome major version: $CHROME_VERSION" \
+ && wget -O /tmp/chromedriver_linux64.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chromedriver-linux64.zip \
+ && unzip /tmp/chromedriver_linux64.zip -d /usr/local/bin/ \
+ && rm /tmp/chromedriver_linux64.zip \
+ && chmod +x /usr/local/bin/chromedriver
+
 # Crear directorio de la app
 WORKDIR /app
 
-# Copiar requirements e instalar dependencias Python
+# Copiar requirements y app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Copiar la app
 COPY . .
 
-# Exponer puerto (solo documentación)
-EXPOSE 5000
+# Exponer puerto
+EXPOSE $PORT
 
-# Arrancar Xvfb en background y Flask como proceso principal
-CMD Xvfb :99 -screen 0 1024x768x16 & python3 selenium_flask_app.py
+# Comando de inicio
+CMD ["xvfb-run", "-a", "python3", "selenium_flask_app.py"]
