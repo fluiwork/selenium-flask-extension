@@ -36,24 +36,19 @@ RUN wget -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/li
  && rm /tmp/google-chrome-stable_current_amd64.deb \
  && rm -rf /var/lib/apt/lists/*
 
-# Instalar ChromeDriver genérico compatible con la última Chrome
-RUN LATEST_CHROMEDRIVER=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE) \
- && wget -O /tmp/chromedriver_linux64.zip https://chromedriver.storage.googleapis.com/${LATEST_CHROMEDRIVER}/chromedriver_linux64.zip \
- && unzip /tmp/chromedriver_linux64.zip -d /usr/local/bin/ \
- && rm /tmp/chromedriver_linux64.zip \
- && chmod +x /usr/local/bin/chromedriver
+# Instalar ChromeDriver usando Selenium Manager (compatible automáticamente)
+RUN pip install selenium==4.15.0 webdriver-manager==4.1.0
 
 # Crear directorio de la app
 WORKDIR /app
 
 # Copiar requirements y app
-COPY requirements.txt .
+COPY requirements.txt . 
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Exponer puerto
 EXPOSE $PORT
 
-# Comando de inicio
-CMD ["python3", "selenium_flask_app.py"]
-
+# Comando de inicio usando Xvfb para headless
+CMD ["xvfb-run", "-a", "python3", "selenium_flask_app.py"]
