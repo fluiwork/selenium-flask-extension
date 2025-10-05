@@ -772,7 +772,46 @@ def run_selenium_task(valor,
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     chrome_options.add_argument('--window-size=1920,1080')
 
-    service = Service(ChromeDriverManager().install())
+    # descargar/obtener ruta inicial (puede devolver carpeta o fichero)
+    raw_driver_path = ChromeDriverManager().install()
+    driver_executable = raw_driver_path
+
+    # si es una carpeta, buscar el ejecutable dentro (nombre exacto 'chromedriver' preferido)
+    if os.path.isdir(raw_driver_path):
+        for root, _, files in os.walk(raw_driver_path):
+            for fname in files:
+                if fname == 'chromedriver' or fname.startswith('chromedriver'):
+                    candidate = os.path.join(root, fname)
+                    # ignorar archivos claramente no binarios (ej: LICENSE, THIRD_PARTY...)
+                    if 'license' in fname.lower() or 'third_party' in fname.lower():
+                        continue
+                    driver_executable = candidate
+                    break
+            if driver_executable != raw_driver_path:
+                break
+
+    # si por alguna razón raw_driver_path no era carpeta pero apunta a un archivo raro,
+    # intentar buscar junto al archivo
+    if driver_executable == raw_driver_path:
+        parent = os.path.dirname(raw_driver_path)
+        if os.path.isdir(parent):
+            for f in os.listdir(parent):
+                if f == 'chromedriver' or f.startswith('chromedriver'):
+                    cand = os.path.join(parent, f)
+                    if os.path.isfile(cand) and 'third_party' not in f.lower() and 'license' not in f.lower():
+                        driver_executable = cand
+                        break
+
+    # forzar permisos ejecutables si es posible
+    try:
+        if os.path.exists(driver_executable):
+            os.chmod(driver_executable, 0o755)
+    except Exception:
+        logger.debug("[!] No se pudo cambiar permisos al driver (continuo de todos modos)")
+
+    logger.debug(f"[*] Usando chromedriver en: {driver_executable}")
+    service = Service(driver_executable)
+
     driver = None
     try:
         logger.debug("[*] Lanzando Chrome (visible=" + str(VISIBLE) + ") ...")
