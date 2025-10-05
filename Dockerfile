@@ -61,7 +61,7 @@ RUN chmod -R 755 /root/.config/google-chrome/Default
 # ==============================
 #  Permisos y entorno
 # ==============================
-RUN if [ -d "/app/chrome_profile_copy/Profile2" ]; then chmod -R 755 /app/chrome_profile_copy/Profile2; fi
+RUN if [ -d "/app/chrome_profile_copy/Profile 2" ]; then chmod -R 755 /app/chrome_profile_copy/Profile2; fi
 
 # Variables opcionales para debug
 ENV EXT_USER_DATA_DIR=/app/chrome_profile_copy/Profile2
