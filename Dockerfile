@@ -46,22 +46,22 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar todo el proyecto, incluyendo el perfil
+# Copiamos TODO el proyecto, incluyendo el perfil y la extensión
 COPY . .
 
 # ==============================
 #  Chrome Profile (con espacio en el nombre)
 # ==============================
 RUN mkdir -p /root/.config/google-chrome/
-COPY "chrome_profile_copy/Profile 2" "/root/.config/google-chrome/Default/"
+COPY 'chrome_profile_copy/Profile 2' '/root/.config/google-chrome/Default/'
 RUN chmod -R 755 /root/.config/google-chrome/Default
 
 # ==============================
 #  Permisos y entorno
 # ==============================
-# Damos permisos al perfil también dentro de /app
 RUN if [ -d "/app/chrome_profile_copy/Profile 2" ]; then chmod -R 755 "/app/chrome_profile_copy/Profile 2"; fi
 
+# Variables opcionales para debug
 ENV EXT_USER_DATA_DIR="/app/chrome_profile_copy/Profile 2"
 
 # ==============================
