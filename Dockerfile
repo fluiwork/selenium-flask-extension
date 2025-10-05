@@ -5,7 +5,7 @@ FROM python:3.13-slim
 ENV PORT=10000
 ENV DISPLAY=:99
 
-# Instalar dependencias de sistema
+# Instalar dependencias del sistema y Xvfb
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -36,10 +36,9 @@ RUN wget -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/li
  && rm /tmp/google-chrome-stable_current_amd64.deb \
  && rm -rf /var/lib/apt/lists/*
 
-# Descargar ChromeDriver que coincide con Chrome
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d '.' -f1) \
- && echo "Chrome major version: $CHROME_VERSION" \
- && wget -O /tmp/chromedriver_linux64.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chromedriver-linux64.zip \
+# Instalar ChromeDriver genérico compatible con la última Chrome
+RUN LATEST_CHROMEDRIVER=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE) \
+ && wget -O /tmp/chromedriver_linux64.zip https://chromedriver.storage.googleapis.com/${LATEST_CHROMEDRIVER}/chromedriver_linux64.zip \
  && unzip /tmp/chromedriver_linux64.zip -d /usr/local/bin/ \
  && rm /tmp/chromedriver_linux64.zip \
  && chmod +x /usr/local/bin/chromedriver
