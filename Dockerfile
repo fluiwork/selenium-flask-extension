@@ -47,8 +47,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-# Exponer puerto
-EXPOSE $PORT
-
 # Comando de inicio usando Xvfb para headless
-CMD ["xvfb-run", "-a", "python3", "selenium_flask_app.py"]
+CMD ["sh", "-c", "xvfb-run -a python3 selenium_flask_app.py"]
+
