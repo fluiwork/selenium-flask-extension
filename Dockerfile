@@ -48,11 +48,35 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # ==============================
-# COPIAR PERFIL DE CHROME
+# MANEJO ROBUSTO DEL PERFIL DE CHROME
 # ==============================
-RUN mkdir -p /root/.config/google-chrome/
-COPY chrome_profile_copy/Profile2 /root/.config/google-chrome/Default/
-RUN chmod -R 755 /root/.config/google-chrome/Default
+# Copiamos todo chrome_profile_copy al temporal y en build elegimos la subcarpeta adecuada
+# Esto maneja nombres con espacios y distintas estructuras (Profile2, "Profile 2", "profile 1", etc.)
+COPY chrome_profile_copy/ /tmp/chrome_profile_copy/
+
+RUN mkdir -p /root/.config/google-chrome/Default && \
+    set -e; \
+    if [ -d "/tmp/chrome_profile_copy/profile_linux" ]; then \
+        echo "Usando /tmp/chrome_profile_copy/profile_linux"; \
+        cp -a "/tmp/chrome_profile_copy/profile_linux/." /root/.config/google-chrome/Default/; \
+    elif [ -d "/tmp/chrome_profile_copy/profile 1" ]; then \
+        echo "Usando /tmp/chrome_profile_copy/profile 1"; \
+        cp -a "/tmp/chrome_profile_copy/profile 1/." /root/.config/google-chrome/Default/; \
+    elif [ -d "/tmp/chrome_profile_copy/Profile2" ]; then \
+        echo "Usando /tmp/chrome_profile_copy/Profile2"; \
+        cp -a "/tmp/chrome_profile_copy/Profile2/." /root/.config/google-chrome/Default/; \
+    elif [ -d "/tmp/chrome_profile_copy/Profile 2" ]; then \
+        echo "Usando /tmp/chrome_profile_copy/Profile 2"; \
+        cp -a "/tmp/chrome_profile_copy/Profile 2/." /root/.config/google-chrome/Default/; \
+    elif [ -d "/tmp/chrome_profile_copy/Profile 1" ]; then \
+        echo "Usando /tmp/chrome_profile_copy/Profile 1"; \
+        cp -a "/tmp/chrome_profile_copy/Profile 1/." /root/.config/google-chrome/Default/; \
+    else \
+        echo "No se encontró un subprofile identificado; copiando todo el contenido de chrome_profile_copy"; \
+        cp -a /tmp/chrome_profile_copy/. /root/.config/google-chrome/Default/; \
+    fi && \
+    chmod -R 755 /root/.config/google-chrome/Default && \
+    rm -rf /tmp/chrome_profile_copy
 
 # ==============================
 # PUERTO Y COMANDO
