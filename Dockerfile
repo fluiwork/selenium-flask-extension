@@ -13,8 +13,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY . /app
 
-# Instala dependencias de Python
-RUN pip install --no-cache-dir -r requirements.txt
+# 🔍 Paso de depuración: mostrar requirements.txt
+RUN echo "=== CONTENIDO DE requirements.txt ===" && cat requirements.txt
+
+# 🔍 Instalación con salida detallada
+RUN pip install --no-cache-dir -v -r requirements.txt
 
 # Expone el puerto del servidor Flask
 EXPOSE 5000
