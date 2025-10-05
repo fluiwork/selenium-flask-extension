@@ -36,14 +36,14 @@ RUN wget -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/li
  && rm /tmp/google-chrome-stable_current_amd64.deb \
  && rm -rf /var/lib/apt/lists/*
 
-# Instalar ChromeDriver usando Selenium Manager (compatible automáticamente)
-RUN pip install selenium==4.15.0 webdriver-manager==4.1.0
+# Instalar Selenium y webdriver-manager (versión estable)
+RUN pip install selenium==4.15.0 webdriver-manager==3.8.6
 
 # Crear directorio de la app
 WORKDIR /app
 
 # Copiar requirements y app
-COPY requirements.txt . 
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
