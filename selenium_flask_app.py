@@ -733,7 +733,7 @@ def run_selenium_task(valor,
     # IMPORTANT: No activar headless automáticamente por VISIBLE.
     # Para habilitar headless explícitamente usar la variable de entorno FORCE_HEADLESS=1
     if os.environ.get("FORCE_HEADLESS", "0") == "1":
-        chrome_options.add_argument('--headless')
+        chrome_options.add_argument("--headless=new")
         logger.debug("[*] FORCE_HEADLESS=1 -> headless enabled")
     else:
         logger.debug("[*] Headless no activado; si estás en servidor, asegúrate de ejecutar Xvfb y exportar DISPLAY. VISIBLE=%s", VISIBLE)
