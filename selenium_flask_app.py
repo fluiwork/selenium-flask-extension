@@ -736,20 +736,191 @@ def run_selenium_task(valor,
 
     # --- Use an existing Chrome user-data-dir and Profile 2 ---
     try:
-        # Allow override via environment variable EXT_USER_DATA_DIR.
-        default_user_data = r"C:\Users\ASUS\Desktop\Borradores\chrome_profile_copy"
-        user_data_dir = os.environ.get("EXT_USER_DATA_DIR", default_user_data)
+        # -------------------------
+        # Configuración de profile / extensión (compatible Windows local + contenedor)
+        # -------------------------
+        repo_root = Path(__file__).parent.resolve()
+        default_profile_rel = repo_root / "chrome_profile_copy"
 
-        # Add the user-data-dir argument (points to the Chrome "User Data" or the folder we copied)
-        if Path(user_data_dir).exists():
-            chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
-            # Explicitly select the profile folder "Profile 2"
-            chrome_options.add_argument(f'--profile-directory=Profile 2')
-            logger.debug(f"[*] Configured Chrome to use user-data-dir={user_data_dir} and profile=Profile 2")
+        # Preferir variable de entorno si está definida
+        env_user_data = os.environ.get("EXT_USER_DATA_DIR", "").strip()
+        if env_user_data:
+            try:
+                user_data_dir = Path(env_user_data).expanduser().resolve()
+            except Exception:
+                user_data_dir = Path(env_user_data)
         else:
-            logger.warning(f"[*] EXT_USER_DATA_DIR not found or does not exist: {user_data_dir}. Chrome will start with a fresh profile.")
+            user_data_dir = default_profile_rel
+
+        # Helper: detectar si el contenido del profile parece haber sido creado en Windows
+        def is_profile_windows(p: Path) -> bool:
+            try:
+                if not p or not p.exists():
+                    return False
+                check_files = []
+                for fname in ("Local State", "Preferences", "Bookmarks"):
+                    f = p / fname
+                    if f.exists():
+                        check_files.append(f)
+                for sub in ("Default", "Profile 2", "Profile 1"):
+                    ss = p / sub
+                    if ss.exists():
+                        for fname in ("Preferences", "Local State", "Bookmarks"):
+                            f = ss / fname
+                            if f.exists():
+                                check_files.append(f)
+                pattern = re.compile(r'[A-Za-z]:\\\\|[A-Za-z]:\\|\\\\\\\\')  # C:\ or \\server
+                for cf in check_files:
+                    try:
+                        text = cf.read_text(encoding='utf-8', errors='ignore')
+                        if pattern.search(text):
+                            return True
+                    except Exception:
+                        try:
+                            with open(cf, 'rb') as fh:
+                                chunk = fh.read(8192)
+                                if re.search(b'[A-Za-z]:\\\\|\\\\\\\\', chunk):
+                                    return True
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+            return False
+
+        # Helper: detectar si profile parece Linux (heurística simple)
+        def is_profile_linux(p: Path) -> bool:
+            try:
+                if not p or not p.exists():
+                    return False
+                # si contiene '/home/' referencias o no contiene patrones Windows
+                check_files = []
+                for fname in ("Local State", "Preferences", "Bookmarks"):
+                    f = p / fname
+                    if f.exists():
+                        check_files.append(f)
+                for cf in check_files:
+                    try:
+                        text = cf.read_text(encoding='utf-8', errors='ignore')
+                        if '/home/' in text or '/.config' in text:
+                            return True
+                        # no encontrar patrones windows sugiere linux
+                        if not re.search(r'[A-Za-z]:\\\\|[A-Za-z]:\\|\\\\\\\\', text):
+                            return True
+                    except Exception:
+                        continue
+                # fallback: si hay subfolder Default y Preferences dentro, considerarlo linux-compatible
+                if (p / "Default").exists() and (p / "Default" / "Preferences").exists():
+                    return True
+            except Exception:
+                pass
+            return False
+
+        # Resolver existencia y permisos
+        if not user_data_dir or not Path(user_data_dir).exists():
+            logger.warning("[PROFILE] user-data-dir no existe: %s", user_data_dir)
+            user_data_dir = None
+        else:
+            try:
+                _ = list(user_data_dir.iterdir())[:1]
+            except PermissionError:
+                logger.error("[PROFILE] Permisos insuficientes para leer user-data-dir: %s", user_data_dir)
+                user_data_dir = None
+            except Exception:
+                logger.debug("[PROFILE] user-data-dir accesible: %s", user_data_dir)
+
+        running_on_windows = (os.name == 'nt')
+
+        # Si existe profile, detectar si fue creado en Windows
+        profile_is_windows = False
+        if user_data_dir:
+            try:
+                profile_is_windows = is_profile_windows(Path(user_data_dir))
+                if profile_is_windows:
+                    logger.warning("[PROFILE] El perfil en %s parece haber sido creado en Windows (heurística detectó rutas Windows).", user_data_dir)
+                else:
+                    logger.info("[PROFILE] El perfil en %s parece compatible con OS actual.", user_data_dir)
+            except Exception:
+                logger.exception("[PROFILE] Error inspeccionando el profile for Windows-compatibility:")
+
+        # Si estamos en Linux (Render) y el profile parece Windows, buscar un perfil Linux alternativo en repo
+        ext_path = os.environ.get("EXT_PATH", str(repo_root / "extensions" / "myext")).strip()
+        if profile_is_windows and not running_on_windows:
+            logger.error("[PROFILE] Perfil detectado como Windows pero el host es Linux. Buscando perfil Linux alternativo en repo...")
+            linux_candidate = None
+            # 1) buscar carpeta chrome_profile_copy_linux
+            for cand_name in ("chrome_profile_copy_linux", "chrome_profile_copy_linux2", "chrome_profile_copy"):
+                cand = repo_root / cand_name
+                if cand.exists() and cand.is_dir() and is_profile_linux(cand):
+                    linux_candidate = cand
+                    break
+            # 2) buscar cualquier carpeta en repo root que parezca profile linux
+            if not linux_candidate:
+                for entry in repo_root.iterdir():
+                    if entry.is_dir() and entry.name.lower().startswith("chrome") and is_profile_linux(entry):
+                        linux_candidate = entry
+                        break
+            # 3) buscar en subcarpeta chrome_profile_copy/* subfolders compatibles
+            if not linux_candidate:
+                base = repo_root / "chrome_profile_copy"
+                if base.exists() and base.is_dir():
+                    for sub in base.iterdir():
+                        if sub.is_dir() and is_profile_linux(sub):
+                            linux_candidate = base
+                            break
+
+            if linux_candidate:
+                logger.warning("[PROFILE] Encontrado perfil Linux alternativo: %s. Usando ese.", linux_candidate)
+                user_data_dir = linux_candidate
+            else:
+                logger.error("[PROFILE] No se encontró perfil Linux alternativo válido en repo. Haré fallback a cargar extensión unpacked (si existe).")
+                user_data_dir = None
+                if ext_path and Path(ext_path).is_dir():
+                    try:
+                        chrome_options.add_argument(f'--load-extension={ext_path}')
+                        logger.warning("[PROFILE] Fallback: cargando extension unpacked desde: %s", ext_path)
+                    except Exception:
+                        logger.exception("[PROFILE] Error añadiendo --load-extension:")
+                else:
+                    logger.warning("[PROFILE] EXT_PATH no existe (%s). Chrome arrancará con perfil limpio en Render.", ext_path)
+
+        # Si no hicimos fallback y el profile existe, usarlo (primero sin profile-directory)
+        if user_data_dir:
+            try:
+                user_data_dir = Path(user_data_dir).resolve()
+                chrome_options.add_argument(f'--user-data-dir={str(user_data_dir)}')
+                logger.warning("[PROFILE] Añadido --user-data-dir=%s", user_data_dir)
+                # intentar detectar sub-profile (Profile 2, Default, Profile 1)
+                chosen_profile = None
+                for cand in ("Profile 2", "Profile 1", "Default"):
+                    if (user_data_dir / cand).exists():
+                        chosen_profile = cand
+                        break
+                if not chosen_profile:
+                    # elegir primer folder de profile plausible
+                    for entry in user_data_dir.iterdir():
+                        if entry.is_dir() and entry.name.lower() not in ("local state", "system volume information"):
+                            chosen_profile = entry.name
+                            break
+                if chosen_profile:
+                    chrome_options.add_argument(f'--profile-directory={chosen_profile}')
+                    logger.warning("[PROFILE] Añadido --profile-directory=%s", chosen_profile)
+                else:
+                    logger.info("[PROFILE] No se encontró subcarpeta de profile; arrancando con user-data-dir sin profile-directory")
+            except Exception:
+                logger.exception("[PROFILE] Error añadiendo user-data-dir/profile-directory:")
+        else:
+            # no hay profile válido: si no se añadió ext_path antes, intentar ahora
+            if ext_path and Path(ext_path).is_dir():
+                try:
+                    chrome_options.add_argument(f'--load-extension={ext_path}')
+                    logger.warning("[PROFILE] No hay profile; cargando extension unpacked desde: %s", ext_path)
+                except Exception:
+                    logger.exception("[PROFILE] No se pudo añadir --load-extension:")
+            else:
+                logger.warning("[PROFILE] No se usará profile ni extension; Chrome arrancará con perfil limpio.")
+
     except Exception:
-        logger.exception("[!] Error intentando configurar user-data-dir/profile-directory:")
+        logger.exception("[PROFILE] Error inesperado configurando profile/extension:")
 
     # Añadido: detach para mantener navegador si se quiere (como en tu snippet)
     chrome_options.add_experimental_option("detach", True)
@@ -819,8 +990,9 @@ def run_selenium_task(valor,
     except Exception:
         logger.debug("[!] No se pudo cambiar permisos al driver (continuo de todos modos)")
 
+    # Usar Service con log_path para diagnosticar (chromedriver.log)
     logger.debug(f"[*] Usando chromedriver en: {driver_executable}")
-    service = Service(driver_executable)
+    service = Service(driver_executable, log_path=str(Path.cwd() / "chromedriver.log"))
 
     driver = None
     try:
@@ -834,6 +1006,26 @@ def run_selenium_task(valor,
             pass
         
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+
+        # Comprobar qué profile está usando realmente Chrome (intentar leer chrome://version)
+        try:
+            time.sleep(0.5)
+            try:
+                driver.get("chrome://version")
+                time.sleep(0.7)
+                src = driver.page_source or ""
+                # comprobación directa contra user_data_dir
+                try:
+                    if 'user_data_dir' in locals() and user_data_dir and str(user_data_dir) in src:
+                        logger.warning("[PROFILE] Chrome arrancó usando el user-data-dir solicitado: %s", user_data_dir)
+                    else:
+                        logger.warning("[PROFILE] Chrome NO parece usar el user-data-dir solicitado (validar).")
+                except Exception:
+                    logger.debug("[PROFILE] No se pudo confirmar chrome://version content")
+            except Exception:
+                logger.debug("[PROFILE] No se pudo abrir chrome://version (posible bloqueo en entorno headless).")
+        except Exception:
+            logger.exception("[PROFILE] Error comprobando chrome://version:")
 
         USER = os.environ.get("MI_SITIO_USER")
         PASS = os.environ.get("MI_SITIO_PASS")
