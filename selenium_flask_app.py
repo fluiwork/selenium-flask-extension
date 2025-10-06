@@ -1,12 +1,15 @@
-# selenium_flask_app.py
+# selenium_flask_app.py 
 """
 Selenium + Flask script (modificado):
  - Login usando iframe 'loginunico' (priorizado).
  - Checkbox de términos automático (fast)
  - Debug reducido: solo diagnóstico relativo a la carga del profile/extension
  - Se removió BASE_URL a petición del usuario.
- - Xvfb para headless en producción
+ - Xvfb para headless en producción (solo en Linux)
  - Logs mejorados (INFO para estados principales)
+ - Detecta extensión dentro del profile y la usa si existe
+ - Heurística de detección Windows refinada
+ - /process -> crea job en background y devuelve job_id; /status/<job_id> para polling
 """
 
 import os
@@ -17,9 +20,11 @@ import logging
 import sys
 import re
 import random
+import uuid
+import concurrent.futures
 from pathlib import Path
 from datetime import datetime, timezone
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, render_template_string, request, jsonify, url_for
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -85,8 +90,13 @@ MANUAL_INTERACTION = False  # Botón automático
 
 MANUAL_WAIT_TIMEOUT = 300  # 5 minutos por defecto
 
+# Threaded job executor for background tasks
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+jobs = {}  # job_id -> Future
+job_results = {}  # job_id -> result dict (when done)
+
 # -------------------------
-# UI simple para probar
+# UI simple para probar (actualizado para polling job-based)
 # -------------------------
 INDEX_HTML = '''
 <!doctype html>
@@ -127,6 +137,27 @@ INDEX_HTML = '''
     const resultCard = document.getElementById('resultCard');
     const resultContent = document.getElementById('resultContent');
 
+    async function pollStatus(status_url, job_id) {
+      const start = Date.now();
+      const timeoutMs = 1000 * 60 * 10; // 10 min max (ajustable)
+      while (true) {
+        try {
+          const resp = await fetch(status_url);
+          const data = await resp.json();
+          if (data.done) {
+            return data.result;
+          }
+        } catch (err) {
+          console.error('Error polling status:', err);
+          // seguir intentando hasta timeout
+        }
+        if (Date.now() - start > timeoutMs) {
+          throw new Error('Timeout en polling del job');
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const valor = document.getElementById('valor').value.trim();
@@ -142,13 +173,24 @@ INDEX_HTML = '''
           body: JSON.stringify({ valor })
         });
         const data = await resp.json();
-        if (data.success) {
+        if (!data || !data.success) {
           overlay.classList.add('hidden');
-          resultContent.textContent = data.result || '(sin resultado)';
-          resultCard.style.display = 'block';
-        } else {
+          return alert('Error al iniciar job: ' + (data && data.error ? data.error : 'desconocido'));
+        }
+        // Poll status
+        const status_url = data.status_url;
+        try {
+          const result = await pollStatus(status_url, data.job_id);
           overlay.classList.add('hidden');
-          alert('Error: ' + (data.error || 'desconocido'));
+          if (result && result.success) {
+            resultContent.textContent = result.result || '(sin resultado)';
+            resultCard.style.display = 'block';
+          } else {
+            alert('Job finalizado con error: ' + (result && result.error ? result.error : 'desconocido'));
+          }
+        } catch (err) {
+          overlay.classList.add('hidden');
+          alert('Error en polling: ' + err.message);
         }
       } catch (err) {
         overlay.classList.add('hidden');
@@ -197,38 +239,7 @@ def resolve_locator(selector: str):
     return (By.CSS_SELECTOR, s)
 
 # -------------------------
-# NEW: Enhanced iframe handling with retries
-# -------------------------
-def wait_for_and_switch_to_iframe(driver, timeout=30):
-    """Wait for iframe to be available and switch to it"""
-    logger.info("[DEBUG] Waiting for login iframe...")
-    end_time = time.time() + timeout
-    while time.time() < end_time:
-        try:
-            frames = driver.find_elements(By.TAG_NAME, "iframe")
-            logger.info(f"[DEBUG] Found {len(frames)} iframes")
-            
-            for idx, frame in enumerate(frames):
-                try:
-                    src = frame.get_attribute("src") or ""
-                    logger.info(f"[DEBUG] Iframe {idx} src: {src}")
-                    if "loginunico" in src.lower() or "azurewebsites" in src.lower():
-                        driver.switch_to.frame(frame)
-                        logger.info(f"[DEBUG] Successfully switched to iframe {idx}")
-                        return True
-                except Exception as e:
-                    logger.debug(f"[DEBUG] Iframe {idx} error: {e}")
-                    continue
-            time.sleep(1)
-        except Exception as e:
-            logger.debug(f"[DEBUG] Iframe search error: {e}")
-            time.sleep(1)
-    
-    logger.error("[DEBUG] Could not find or switch to login iframe")
-    return False
-
-# -------------------------
-# Funciones login (solo flujo iframe 'loginunico') - MEJORADO
+# Funciones login (solo flujo iframe 'loginunico')
 # -------------------------
 def perform_login(driver,
                   login_url,
@@ -238,187 +249,173 @@ def perform_login(driver,
                   post_login_check_selector,
                   wait_timeout=ELEMENT_WAIT_TIMEOUT):
     logger.info("[*] Realizando login (robusto, flujo único - iframe 'loginunico') ...")
-    logger.info("[DEBUG] Starting enhanced login process")
-    
     try:
         try:
             driver.get(login_url)
-            logger.info(f"[DEBUG] Navigated to login URL: {login_url}")
         except Exception:
             logger.exception("[!] driver.get(login_url) fallo, prosigo con intentos.")
 
         try:
             WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
-            logger.info("[DEBUG] Page reached complete ready state")
         except Exception:
             logger.debug("[*] Advertencia: readyState no llegó a 'complete' en 10s (continúa)")
 
-        # NEW: Use enhanced iframe handling
-        if not wait_for_and_switch_to_iframe(driver, timeout=15):
-            logger.error("[ERROR] No se pudo encontrar o cambiar al iframe de login")
-            return False
-
-        logger.info("[*] Dentro del iframe elegido, buscando campos de usuario/clave")
-
-        by_u, sel_u = resolve_locator(username_selector)
-        by_p, sel_p = resolve_locator(password_selector)
-        user_el = None
-        pass_el = None
-        
-        logger.info("[DEBUG] Looking for username field...")
-        try:
-            els_u = driver.find_elements(by_u, sel_u)
-            logger.info(f"[DEBUG] Found {len(els_u)} username elements")
-            if els_u:
-                user_el = els_u[0]
-                logger.info("[DEBUG] Username field found with primary selector")
-        except Exception as e:
-            logger.info(f"[DEBUG] Username primary selector failed: {e}")
-
-        logger.info("[DEBUG] Looking for password field...")
-        try:
-            els_p = driver.find_elements(by_p, sel_p)
-            logger.info(f"[DEBUG] Found {len(els_p)} password elements")
-            if els_p:
-                pass_el = els_p[0]
-                logger.info("[DEBUG] Password field found with primary selector")
-        except Exception as e:
-            logger.info(f"[DEBUG] Password primary selector failed: {e}")
-
-        # Fallback para username
-        if not user_el:
-            logger.info("[DEBUG] Trying fallback selectors for username...")
-            for cand in ['input[type="text"]', 'input[type="email"]', 'input[id*="user"]', 'input[name*="user"]', 'input[id*="username"]']:
-                try:
-                    els = driver.find_elements(By.CSS_SELECTOR, cand)
-                    if els:
-                        user_el = els[0]
-                        logger.info(f"[DEBUG] Username field found with fallback: {cand}")
-                        break
-                except Exception as e:
-                    logger.debug(f"[DEBUG] Username fallback {cand} failed: {e}")
-
-        # Fallback para password
-        if not pass_el:
-            logger.info("[DEBUG] Trying fallback selectors for password...")
-            for cand in ['input[type="password"]', 'input[id*="pass"]', 'input[name*="pass"]', 'input[id*="password"]']:
-                try:
-                    els = driver.find_elements(By.CSS_SELECTOR, cand)
-                    if els:
-                        pass_el = els[0]
-                        logger.info(f"[DEBUG] Password field found with fallback: {cand}")
-                        break
-                except Exception as e:
-                    logger.debug(f"[DEBUG] Password fallback {cand} failed: {e}")
-
-        if not user_el or not pass_el:
-            logger.error("[!] No se localizaron campos de login dentro del iframe seleccionado.")
-            # Check for error messages
+        frames = driver.find_elements(By.TAG_NAME, "iframe")
+        logger.info("[*] Iframes detectados: %d", len(frames))
+        chosen_frame = None
+        for idx, fr in enumerate(frames):
             try:
-                error_elements = driver.find_elements(By.CSS_SELECTOR, ".error, .alert, .message-error, .text-danger")
-                if error_elements:
-                    logger.error(f"[DEBUG] Error messages in iframe: {[el.text for el in error_elements if el.text]}")
-            except Exception as e:
-                logger.debug(f"[DEBUG] Error checking for error messages: {e}")
-            driver.switch_to.default_content()
-            return False
+                src = fr.get_attribute("src") or ""
+                low = src.lower()
+                if "loginunico" in low or "azurewebsites" in low or "loginunico-prd" in low:
+                    chosen_frame = fr
+                    logger.info("[*] Elegido iframe[%d] para login (src=%s)", idx, src)
+                    break
+            except Exception:
+                pass
 
-        USER = os.environ.get("MI_SITIO_USER")
-        PASS = os.environ.get("MI_SITIO_PASS")
-        if not USER or not PASS:
-            logger.error("[!] Credenciales no configuradas en variables de entorno.")
-            driver.switch_to.default_content()
-            return False
-
-        logger.info("[DEBUG] Filling credentials...")
-        try:
-            user_el.clear()
-        except Exception:
-            pass
-        user_el.send_keys(USER)
-        logger.info("[DEBUG] Username filled")
-        
-        try:
-            pass_el.clear()
-        except Exception:
-            pass
-        pass_el.send_keys(PASS)
-        logger.info("[DEBUG] Password filled")
-
-        submitted = False
-        logger.info("[DEBUG] Attempting form submission...")
-        try:
-            btns = driver.find_elements(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
-            logger.info(f"[DEBUG] Found {len(btns)} submit buttons")
-            if btns:
-                for b in btns:
-                    try:
-                        driver.execute_script("arguments[0].click();", b)
-                        submitted = True
-                        logger.info("[DEBUG] Form submitted with JavaScript")
+        if not chosen_frame:
+            for idx, fr in enumerate(frames):
+                try:
+                    driver.switch_to.frame(fr)
+                    inputs_in_frame = driver.find_elements(By.TAG_NAME, "input")
+                    if inputs_in_frame and len(inputs_in_frame) >= 1:
+                        chosen_frame = fr
+                        logger.info("[*] Elegido iframe[%d] por heurística (tiene inputs).", idx)
+                    driver.switch_to.default_content()
+                    if chosen_frame:
                         break
-                    except Exception as e:
-                        logger.debug(f"[DEBUG] JS click failed: {e}")
-                        continue
+                except Exception:
+                    try:
+                        driver.switch_to.default_content()
+                    except Exception:
+                        pass
+
+        if not chosen_frame:
+            logger.error("[ERROR] No se encontró iframe de login adecuado.")
+            return False
+
+        try:
+            driver.switch_to.frame(chosen_frame)
+            logger.info("[*] Dentro del iframe elegido, buscando campos de usuario/clave")
+
+            by_u, sel_u = resolve_locator(username_selector)
+            by_p, sel_p = resolve_locator(password_selector)
+            user_el = None
+            pass_el = None
+            try:
+                els_u = driver.find_elements(by_u, sel_u)
+                if els_u:
+                    user_el = els_u[0]
+            except Exception:
+                pass
+
+            try:
+                els_p = driver.find_elements(by_p, sel_p)
+                if els_p:
+                    pass_el = els_p[0]
+            except Exception:
+                pass
+
+            if not user_el:
+                for cand in ['input[type="text"]', 'input[type="email"]', 'input[id*="user"]', 'input[name*="user"]', 'input[id*="username"]']:
+                    try:
+                        els = driver.find_elements(By.CSS_SELECTOR, cand)
+                        if els:
+                            user_el = els[0]
+                            break
+                    except Exception:
+                        pass
+
+            if not pass_el:
+                for cand in ['input[type="password"]', 'input[id*="pass"]', 'input[name*="pass"]', 'input[id*="password"]']:
+                    try:
+                        els = driver.find_elements(By.CSS_SELECTOR, cand)
+                        if els:
+                            pass_el = els[0]
+                            break
+                    except Exception:
+                        pass
+
+            if not user_el or not pass_el:
+                logger.error("[!] No se localizaron campos de login dentro del iframe seleccionado.")
+                driver.switch_to.default_content()
+                return False
+
+            USER = os.environ.get("MI_SITIO_USER")
+            PASS = os.environ.get("MI_SITIO_PASS")
+            if not USER or not PASS:
+                logger.error("[!] Credenciales no configuradas en variables de entorno.")
+                driver.switch_to.default_content()
+                return False
+
+            try:
+                user_el.clear()
+            except Exception:
+                pass
+            user_el.send_keys(USER)
+            try:
+                pass_el.clear()
+            except Exception:
+                pass
+            pass_el.send_keys(PASS)
+
+            submitted = False
+            try:
+                btns = driver.find_elements(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+                if btns:
+                    for b in btns:
+                        try:
+                            driver.execute_script("arguments[0].click();", b)
+                            submitted = True
+                            break
+                        except Exception:
+                            pass
+                if not submitted:
+                    bxp = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'ingresar') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'iniciar') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'entrar')]"
+                    els_b = driver.find_elements(By.XPATH, bxp)
+                    if els_b:
+                        try:
+                            driver.execute_script("arguments[0].click();", els_b[0])
+                            submitted = True
+                        except Exception:
+                            pass
+            except Exception:
+                logger.exception("[!] Error intentando submit dentro del iframe:")
+
+            driver.switch_to.default_content()
+
             if not submitted:
-                bxp = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'ingresar') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'iniciar') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'entrar')]"
-                els_b = driver.find_elements(By.XPATH, bxp)
-                logger.info(f"[DEBUG] Found {len(els_b)} buttons with text fallback")
-                if els_b:
-                    try:
-                        driver.execute_script("arguments[0].click();", els_b[0])
-                        submitted = True
-                        logger.info("[DEBUG] Form submitted with text fallback")
-                    except Exception as e:
-                        logger.debug(f"[DEBUG] Text fallback submit failed: {e}")
-        except Exception as e:
-            logger.exception(f"[!] Error intentando submit dentro del iframe: {e}")
+                logger.warning("[!] No se pudo pulsar submit dentro del iframe.")
+                return False
 
-        driver.switch_to.default_content()
-        logger.info("[DEBUG] Switched back to default content")
-
-        if not submitted:
-            logger.warning("[!] No se pudo pulsar submit dentro del iframe.")
-            return False
-
-        logger.info("[DEBUG] Checking for post-login element...")
-        try:
-            by_check, sel_check = resolve_locator(post_login_check_selector)
-            WebDriverWait(driver, wait_timeout).until(EC.presence_of_element_located((by_check, sel_check)))
-            logger.info("[+] Login confirmado en document principal tras submit en iframe")
-            
-            # NEW: Enhanced login recovery
             try:
-                driver.get(TARGET_URL)
-                WebDriverWait(driver, 8).until(lambda d: d.execute_script("return document.readyState") == "complete")
-                logger.info("[*] Redirigido a TARGET_URL inmediatamente tras login")
-            except Exception as e:
-                logger.info(f"[*] No se pudo redirigir inmediatamente a TARGET_URL: {e}")
-            
-            save_cookies_to_file(driver)
-            return True
-        except Exception as e:
-            logger.warning(f"[!] No se detectó post-login tras submit en iframe: {e}")
-            
-            # NEW: Enhanced error recovery
-            logger.info("[DEBUG] Attempting login recovery...")
+                by_check, sel_check = resolve_locator(post_login_check_selector)
+                WebDriverWait(driver, wait_timeout).until(EC.presence_of_element_located((by_check, sel_check)))
+                logger.info("[+] Login confirmado en document principal tras submit en iframe")
+                # --- Navegar inmediatamente al TARGET_URL para evitar quedarse en la página intermedia ---
+                try:
+                    driver.get(TARGET_URL)
+                    WebDriverWait(driver, 6).until(lambda d: d.execute_script("return document.readyState") == "complete")
+                    logger.info("[*] Redirigido a TARGET_URL inmediatamente tras login")
+                except Exception:
+                    logger.info("[*] No se pudo redirigir inmediatamente a TARGET_URL o la carga fue lenta, el flujo continuará normalmente.")
+                save_cookies_to_file(driver)
+                return True
+            except Exception:
+                logger.warning("[!] No se detectó post-login tras submit en iframe (posible fallo).")
+                return False
+
+        except Exception:
+            logger.exception("[!] Error dentro del iframe durante login:")
             try:
-                current_url = driver.current_url.lower()
-                if 'login' not in current_url and 'auth' not in current_url:
-                    logger.info("[DEBUG] Recovery: Already logged in despite earlier failure")
-                    save_cookies_to_file(driver)
-                    return True
-            except Exception as url_error:
-                logger.debug(f"[DEBUG] URL check failed: {url_error}")
-            
+                driver.switch_to.default_content()
+            except Exception:
+                pass
             return False
 
     except Exception:
         logger.exception("[!] perform_login fallo inesperado:")
-        try:
-            driver.switch_to.default_content()
-        except Exception:
-            pass
         return False
 
 
@@ -750,7 +747,57 @@ def has_desired_structure(text):
     return False
 
 # -------------------------
-# Funcion principal Selenium (integrada) - MEJORADA
+# Util: buscar extensión dentro del profile si existe
+# -------------------------
+def find_extension_in_profile(profile_dir: Path):
+    try:
+        # probar carpeta Default/Extensions y Extensions
+        for base_candidate in (profile_dir / "Default" / "Extensions", profile_dir / "Extensions", profile_dir / "Default" / "extensions"):
+            ext_root = Path(base_candidate)
+            if ext_root.exists() and ext_root.is_dir():
+                for ext_id in ext_root.iterdir():
+                    if not ext_id.is_dir():
+                        continue
+                    for ver in ext_id.iterdir():
+                        m = ver / "manifest.json"
+                        if m.exists():
+                            return ver
+    except Exception:
+        pass
+    return None
+
+# -------------------------
+# Heurística refinada: detectar perfil Windows (menos falsos positivos)
+# -------------------------
+def is_profile_windows(p: Path) -> bool:
+    try:
+        if not p or not p.exists():
+            return False
+        check_files = []
+        for fname in ("Local State", "Preferences", "Bookmarks"):
+            f = p / fname
+            if f.exists():
+                check_files.append(f)
+        pattern_text = re.compile(r'[A-Za-z]:\\[\\/][^\\\s]+')  # e.g. C:\Users\...
+        for cf in check_files:
+            try:
+                text = cf.read_text(encoding='utf-8', errors='ignore')
+                if pattern_text.search(text):
+                    return True
+            except Exception:
+                try:
+                    with open(cf, 'rb') as fh:
+                        chunk = fh.read(16384)
+                        if re.search(b'[A-Za-z]:\\\\', chunk):
+                            return True
+                except Exception:
+                    continue
+        return False
+    except Exception:
+        return False
+
+# -------------------------
+# Funcion principal Selenium (integrada)
 # -------------------------
 def run_selenium_task(valor,
                       target_url=TARGET_URL,
@@ -765,17 +812,11 @@ def run_selenium_task(valor,
                       post_login_check_selector=POST_LOGIN_CHECK_SELECTOR,
                       wait_timeout=ELEMENT_WAIT_TIMEOUT):
     
-    # NEW: Detect Render environment and adjust timeouts
-    is_render = os.environ.get('RENDER', False)
-    if is_render:
-        logger.info("[DEBUG] Running in Render environment - adjusting timeouts")
-        wait_timeout = max(wait_timeout, 45)
-        PAGE_LOAD_TIMEOUT = 60
-
-    # Iniciar Xvfb para entorno headless - CONFIGURACIÓN MEJORADA
+    # Iniciar Xvfb para entorno headless - solo en Linux (no en Windows)
     display = None
     display_var = os.environ.get('DISPLAY')
-    if not VISIBLE and not display_var:
+    running_on_windows = (os.name == 'nt')
+    if not VISIBLE and not display_var and not running_on_windows:
         logger.info("Iniciando Xvfb para entorno headless...")
         try:
             from pyvirtualdisplay import Display
@@ -784,7 +825,11 @@ def run_selenium_task(valor,
             logger.info("Xvfb iniciado correctamente")
         except Exception as e:
             logger.error(f"Error iniciando Xvfb: {e}")
-
+    else:
+        if not VISIBLE and running_on_windows:
+            # fallback para Windows headless
+            logger.info("Host Windows detectado: usando --headless=new para headless en Windows.")
+    
     chrome_options = Options()
 
     # --- Use an existing Chrome user-data-dir and Profile 2 ---
@@ -805,69 +850,6 @@ def run_selenium_task(valor,
         else:
             user_data_dir = default_profile_rel
 
-        # Helper: detectar si el contenido del profile parece haber sido creado en Windows
-        def is_profile_windows(p: Path) -> bool:
-            try:
-                if not p or not p.exists():
-                    return False
-                check_files = []
-                for fname in ("Local State", "Preferences", "Bookmarks"):
-                    f = p / fname
-                    if f.exists():
-                        check_files.append(f)
-                for sub in ("Default", "Profile 2", "Profile 1"):
-                    ss = p / sub
-                    if ss.exists():
-                        for fname in ("Preferences", "Local State", "Bookmarks"):
-                            f = ss / fname
-                            if f.exists():
-                                check_files.append(f)
-                pattern = re.compile(r'[A-Za-z]:\\\\|[A-Za-z]:\\|\\\\\\\\')  # C:\ or \\server
-                for cf in check_files:
-                    try:
-                        text = cf.read_text(encoding='utf-8', errors='ignore')
-                        if pattern.search(text):
-                            return True
-                    except Exception:
-                        try:
-                            with open(cf, 'rb') as fh:
-                                chunk = fh.read(8192)
-                                if re.search(b'[A-Za-z]:\\\\|\\\\\\\\', chunk):
-                                    return True
-                        except Exception:
-                            continue
-            except Exception:
-                pass
-            return False
-
-        # Helper: detectar si profile parece Linux (heurística simple)
-        def is_profile_linux(p: Path) -> bool:
-            try:
-                if not p or not p.exists():
-                    return False
-                # si contiene '/home/' referencias o no contiene patrones Windows
-                check_files = []
-                for fname in ("Local State", "Preferences", "Bookmarks"):
-                    f = p / fname
-                    if f.exists():
-                        check_files.append(f)
-                for cf in check_files:
-                    try:
-                        text = cf.read_text(encoding='utf-8', errors='ignore')
-                        if '/home/' in text or '/.config' in text:
-                            return True
-                        # no encontrar patrones windows sugiere linux
-                        if not re.search(r'[A-Za-z]:\\\\|[A-Za-z]:\\|\\\\\\\\', text):
-                            return True
-                    except Exception:
-                        continue
-                # fallback: si hay subfolder Default y Preferences dentro, considerarlo linux-compatible
-                if (p / "Default").exists() and (p / "Default" / "Preferences").exists():
-                    return True
-            except Exception:
-                pass
-            return False
-
         # Resolver existencia y permisos
         if not user_data_dir or not Path(user_data_dir).exists():
             logger.warning("[PROFILE] user-data-dir no existe: %s", user_data_dir)
@@ -881,9 +863,7 @@ def run_selenium_task(valor,
             except Exception:
                 logger.info("[PROFILE] user-data-dir accesible: %s", user_data_dir)
 
-        running_on_windows = (os.name == 'nt')
-
-        # Si existe profile, detectar si fue creado en Windows
+        # detectar si el contenido del profile parece haber sido creado en Windows (refinado)
         profile_is_windows = False
         if user_data_dir:
             try:
@@ -895,9 +875,6 @@ def run_selenium_task(valor,
             except Exception:
                 logger.exception("[PROFILE] Error inspeccionando el profile for Windows-compatibility:")
 
-        # -------------------------
-        # NUEVO: Diagnóstico y forzado de carga de extensión unpacked
-        # -------------------------
         # ext_path se usará para --load-extension si no usamos perfil o si el perfil no es válido
         manifest_name = None
         ext_path_raw = os.environ.get("EXT_PATH", str(repo_root / "extensions" / "myext")).strip()
@@ -908,27 +885,25 @@ def run_selenium_task(valor,
 
         logger.info("[EXT DEBUG] EXT_PATH resuelto a: %s (exists=%s)", ext_path, ext_path.exists())
 
+        # Si profile parece Windows y host es Linux, buscar alternativa Linux; si ya es Linux, usarlo.
         if profile_is_windows and not running_on_windows:
             logger.error("[PROFILE] Perfil detectado como Windows pero el host es Linux. Buscando perfil Linux alternativo en repo...")
             linux_candidate = None
-            # 1) buscar carpeta chrome_profile_copy_linux
             for cand_name in ("chrome_profile_copy_linux", "chrome_profile_copy_linux2", "chrome_profile_copy"):
                 cand = repo_root / cand_name
-                if cand.exists() and cand.is_dir() and is_profile_linux(cand):
+                if cand.exists() and cand.is_dir() and not is_profile_windows(cand):
                     linux_candidate = cand
                     break
-            # 2) buscar cualquier carpeta en repo root que parezca profile linux
             if not linux_candidate:
                 for entry in repo_root.iterdir():
-                    if entry.is_dir() and entry.name.lower().startswith("chrome") and is_profile_linux(entry):
+                    if entry.is_dir() and entry.name.lower().startswith("chrome") and not is_profile_windows(entry):
                         linux_candidate = entry
                         break
-            # 3) buscar en subcarpeta chrome_profile_copy/* subfolders compatibles
             if not linux_candidate:
                 base = repo_root / "chrome_profile_copy"
                 if base.exists() and base.is_dir():
                     for sub in base.iterdir():
-                        if sub.is_dir() and is_profile_linux(sub):
+                        if sub.is_dir() and not is_profile_windows(sub):
                             linux_candidate = base
                             break
 
@@ -938,8 +913,8 @@ def run_selenium_task(valor,
             else:
                 logger.error("[PROFILE] No se encontró perfil Linux alternativo válido en repo. Haré fallback a cargar extensión unpacked (si existe).")
                 user_data_dir = None
-                # Intento forzado de carga de extension unpacked más abajo
-        # Si no hicimos fallback y el profile existe, usarlo (primero sin profile-directory)
+
+        # Si hay user_data_dir válido, añadirlo
         if user_data_dir:
             try:
                 user_data_dir = Path(user_data_dir).resolve()
@@ -952,7 +927,6 @@ def run_selenium_task(valor,
                         chosen_profile = cand
                         break
                 if not chosen_profile:
-                    # elegir primer folder de profile plausible
                     for entry in user_data_dir.iterdir():
                         if entry.is_dir() and entry.name.lower() not in ("local state", "system volume information"):
                             chosen_profile = entry.name
@@ -964,6 +938,23 @@ def run_selenium_task(valor,
                     logger.info("[PROFILE] No se encontró subcarpeta de profile; arrancando con user-data-dir sin profile-directory")
             except Exception:
                 logger.exception("[PROFILE] Error añadiendo user-data-dir/profile-directory:")
+
+            # --- NUEVA LÓGICA: si la extensión está dentro del profile, usarla ---
+            try:
+                found_ext_in_profile = find_extension_in_profile(Path(user_data_dir))
+                if found_ext_in_profile:
+                    ext_path = found_ext_in_profile
+                    logger.info("[EXT AUTO] Encontrada extensión dentro del profile: %s", ext_path)
+                    try:
+                        if (ext_path / "manifest.json").exists():
+                            chrome_options.add_argument(f'--disable-extensions-except={str(ext_path)}')
+                            chrome_options.add_argument(f'--load-extension={str(ext_path)}')
+                            logger.warning("[EXT AUTO] Añadidos flags --load-extension desde profile para %s", ext_path)
+                    except Exception:
+                        logger.exception("[EXT AUTO] Error añadiendo flags desde profile")
+            except Exception:
+                logger.exception("[EXT AUTO] Error buscando extensión dentro del profile")
+
         else:
             # no hay profile válido: intentar cargar extensión unpacked desde ext_path
             try:
@@ -1000,21 +991,18 @@ def run_selenium_task(valor,
     except Exception:
         logger.exception("[PROFILE] Error inesperado configurando profile/extension:")
 
-    # NEW: Enhanced Chrome configuration for Linux/Render
+    # Añadido: detach para mantener navegador si se quiere (como en tu snippet)
     chrome_options.add_experimental_option("detach", True)
-    
-    # Essential for Linux environments
+
+    # Si estamos en Windows y pedimos headless (no Xvfb), añadir flag headless
+    if not VISIBLE and running_on_windows:
+        try:
+            chrome_options.add_argument('--headless=new')
+        except Exception:
+            pass
+
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--remote-debugging-port=9222')
-    
-    # Enhanced compatibility flags for headless
-    if not VISIBLE:
-        chrome_options.add_argument('--headless=new')
-        chrome_options.add_argument('--disable-features=VizDisplayCompositor')
-        chrome_options.add_argument('--disable-software-rasterizer')
-    
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     
@@ -1098,7 +1086,6 @@ def run_selenium_task(valor,
                 driver.get("chrome://version")
                 time.sleep(0.7)
                 src = driver.page_source or ""
-                # comprobación directa contra user_data_dir
                 try:
                     if 'user_data_dir' in locals() and user_data_dir and str(user_data_dir) in src:
                         logger.warning("[PROFILE] Chrome arrancó usando el user-data-dir solicitado: %s", user_data_dir)
@@ -1113,21 +1100,40 @@ def run_selenium_task(valor,
 
         # ---- NUEVO: después de arrancar el driver, comprobar chrome://extensions para ver si la extensión aparece ----
         try:
-            if manifest_name:
+            if 'manifest_name' in locals() and manifest_name:
                 try:
                     driver.get("chrome://extensions/")
-                    time.sleep(0.8)
+                    time.sleep(1.2)
                     src_ext = driver.page_source or ""
                     if manifest_name.lower() in src_ext.lower():
                         logger.info("[EXT CHECK] La extensión aparece en chrome://extensions (nombre detectado: %s).", manifest_name)
                     else:
                         logger.warning("[EXT CHECK] La extensión NO aparece en chrome://extensions. Revisa chromedriver.log o la consola de extensiones.")
-                        logger.debug("[EXT CHECK] chrome://extensions page snippet: %s", (src_ext or "")[:2000])
+                        logger.debug("[EXT CHECK] chrome://extensions page snippet (trunc): %s", (src_ext or "")[:4000])
                 except Exception:
                     logger.exception("[EXT CHECK] Error intentando inspeccionar chrome://extensions")
+            else:
+                # Si manifest_name desconocido, hacer snippet check por si la extensión fue hallada por ext_path
+                try:
+                    driver.get("chrome://extensions/")
+                    time.sleep(1.2)
+                    src_ext = driver.page_source or ""
+                    logger.debug("[EXT CHECK] chrome://extensions page snippet (trunc): %s", (src_ext or "")[:4000])
+                except Exception:
+                    pass
         except Exception:
             pass
         # ---- FIN NUEVO ----
+
+        # Log snippet de Preferences si existe (diagnóstico)
+        try:
+            if 'user_data_dir' in locals() and user_data_dir:
+                pref = Path(user_data_dir) / "Default" / "Preferences"
+                if pref.exists():
+                    snippet = pref.read_text(encoding='utf-8', errors='ignore')[:4000]
+                    logger.debug("[PROFILE PREF SNIPPET] %s", snippet)
+        except Exception:
+            pass
 
         USER = os.environ.get("MI_SITIO_USER")
         PASS = os.environ.get("MI_SITIO_PASS")
@@ -1145,7 +1151,7 @@ def run_selenium_task(valor,
                              password_selector=password_selector,
                              submit_selector=submit_selector,
                              post_login_check_selector=post_login_check_selector,
-                             wait_timeout=wait_timeout)
+                             wait_timeout=wait_timeout + 10)  # dar algo más de tiempo en contenedores
         except Exception:
             logger.exception("[!] ensure_logged_in threw:")
 
@@ -1164,9 +1170,9 @@ def run_selenium_task(valor,
         time.sleep(1.0)
         try:
             current = driver.current_url or ""
-            logger.info("[*] URL actual tras navegación: %s", current)
         except Exception:
             current = ""
+        logger.info("[*] URL actual tras navegación: %s", current)
 
         if 'login' in current.lower() or 'auth' in current.lower() or (not logged and ('clientes' in current and 'paga-tus-facturas' not in current)):
             logger.info("[*] Detectada redirección a login o no estamos logueados; reintentando login y luego navegando al target_url.")
@@ -1177,7 +1183,7 @@ def run_selenium_task(valor,
                               password_selector,
                               submit_selector,
                               post_login_check_selector,
-                              wait_timeout=wait_timeout)
+                              wait_timeout=wait_timeout + 10)
             except Exception:
                 logger.exception("[!] perform_login lanzó excepción en reintento:")
             try:
@@ -1463,7 +1469,7 @@ return findDeep(arguments[0]);
                 logger.error(f"Error deteniendo Xvfb: {e}")
 
 # -------------------------
-# Flask routes
+# Flask routes (job-based / always JSON)
 # -------------------------
 @app.route('/')
 def index():
@@ -1472,13 +1478,52 @@ def index():
 @app.route('/process', methods=['POST'])
 def process():
     data = request.get_json(force=True)
-    valor = data.get('valor', '').strip()
+    valor = (data.get('valor') or '').strip()
     if not valor:
         return jsonify({'success': False, 'error': 'Valor vacío'})
 
-    res = run_selenium_task(valor)
-    return jsonify(res)
+    job_id = str(uuid.uuid4())
+    logger.info("[JOB] Creando job %s para valor=%s", job_id, valor)
+
+    def task_wrapper(v, jid):
+        try:
+            res = run_selenium_task(v)
+            return res
+        except Exception:
+            tb = traceback.format_exc()
+            logger.exception("[JOB] Exception en job %s:", jid)
+            return {'success': False, 'error': 'Exception en run_selenium_task', 'trace': tb}
+
+    future = executor.submit(task_wrapper, valor, job_id)
+    jobs[job_id] = future
+
+    status_url = url_for('job_status', job_id=job_id, _external=False)
+    return jsonify({'success': True, 'job_id': job_id, 'status_url': status_url}), 202
+
+@app.route('/status/<job_id>', methods=['GET'])
+def job_status(job_id):
+    try:
+        if job_id not in jobs:
+            if job_id in job_results:
+                return jsonify({'success': True, 'done': True, 'result': job_results[job_id]})
+            return jsonify({'success': False, 'error': 'Job desconocido'}), 404
+
+        f = jobs[job_id]
+        if f.done():
+            try:
+                res = f.result()
+            except Exception:
+                res = {'success': False, 'error': 'Error recogiendo resultado', 'trace': traceback.format_exc()}
+            job_results[job_id] = res
+            del jobs[job_id]
+            return jsonify({'success': True, 'done': True, 'result': res})
+        else:
+            return jsonify({'success': True, 'done': False})
+    except Exception:
+        tb = traceback.format_exc()
+        logger.exception("[STATUS] Error gestionando estado del job:")
+        return jsonify({'success': False, 'error': 'Error interno', 'trace': tb}), 500
 
 if __name__ == '__main__':
-    # Ejecutar Flask con debug=False para evitar logs de desarrollo
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Ejecutar Flask con debug=False para evitar reloader y logs de dev que confunden procesos hijos
+    app.run(host='0.0.0.0', port=5000, debug=False)
