@@ -830,6 +830,8 @@ def run_selenium_task(valor,
                 logger.exception("[PROFILE] Error añadiendo --load-extension:")
 
         # chrome options baseline
+        chrome_options.add_argument('--headless=new')
+        chrome_options.add_argument('--disable-gpu')  # Recomendado para headless
         chrome_options.add_experimental_option("detach", True)
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
