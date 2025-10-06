@@ -1,11 +1,9 @@
 # selenium_flask_app.py
 """
 Selenium + Flask script (modificado):
- - Añadida: copia temporal del profile 'Profile 2' para evitar "user data directory is already in use".
- - Mejora: detección de la extensión Captcha Solver usando heurística ampliada (busca "capsolver",
-   "captcha solver", "captcha-solver", y "captcha" en manifest name/description).
- - Logs concisos sobre estado del profile, extensión, reCAPTCHA y habilitación del botón.
- - Mantiene la lógica original salvo las mejoras solicitadas.
+ - Forzar carga unpacked de la extensión encontrada en Profile 2 con --load-extension.
+ - Logs adicionales concisos sobre carga del profile, detección de la extensión y estado de reCAPTCHA.
+ - Mantiene el resto de la lógica intacta.
 """
 
 import os
@@ -62,11 +60,11 @@ VISIBLE = False   # headless via Xvfb
 LOGIN_URL = "https://clientes.celsia.com/clientes/login"
 TARGET_URL = "https://clientes.celsia.com/clientes/paga-tus-facturas"
 
-# Selectors (deja los tuyos)
+# Selectors (mantén los tuyos)
 USERNAME_SELECTOR = '//*[@id="root"]/div/div[2]/div/div/span/div/div/div/form/div[1]/div/input'
 PASSWORD_SELECTOR = '//*[@id="root"]/div/div[2]/div/div/span/div/div/div/form/div[2]/div/input'
 SUBMIT_SELECTOR = 'button[type="submit"]'
-POST_LOGIN_CHECK_SELECTOR = 'app-request-invoice'  # Elemento post-login
+POST_LOGIN_CHECK_SELECTOR = 'app-request-invoice'
 
 INPUT_SELECTOR = '#nicABuscar'
 TERMS_CHECKBOX_SELECTOR = '//*[@id="mat-checkbox-1"]/label'
@@ -194,18 +192,9 @@ def resolve_locator(selector: str):
 
 # Detect extension 'capsolver' in profile (enhanced heuristic)
 def detect_capsolver_in_profile(profile_path: Path):
-    """
-    Busca manifest.json y detecta extensiones con keywords:
-      - 'capsolver'
-      - 'captcha solver'
-      - 'captcha-solver'
-      - 'captcha'
-    Retorna (found_bool, details_list)
-    """
     try:
         details = []
-        keywords = ("capsolver", "captcha solver", "captcha-solver", "captcha solver:", "captcha")
-        # common extension locations
+        keywords = ("capsolver", "captcha solver", "captcha-solver", "captcha")
         candidates = [
             profile_path / "Default" / "Extensions",
             profile_path / "Extensions",
@@ -235,7 +224,8 @@ def detect_capsolver_in_profile(profile_path: Path):
                                                 "version_dir": str(ver.name),
                                                 "name": j.get("name"),
                                                 "description": j.get("description"),
-                                                "match_keyword": found_kw
+                                                "match_keyword": found_kw,
+                                                "manifest_path": str(man)
                                             })
                                         except Exception:
                                             details.append({
@@ -243,7 +233,8 @@ def detect_capsolver_in_profile(profile_path: Path):
                                                 "version_dir": str(ver.name),
                                                 "name": None,
                                                 "description": None,
-                                                "match_keyword": None
+                                                "match_keyword": None,
+                                                "manifest_path": str(man) if man.exists() else None
                                             })
             except Exception:
                 continue
@@ -493,7 +484,7 @@ def ensure_logged_in(driver,
         logger.warning("[!] No se pudo iniciar sesión automáticamente (perform_login devolvió False).")
         return False
 
-# Accept terms (same)
+# Accept terms
 def accept_terms_if_present(driver,
                             checkbox_selector=TERMS_CHECKBOX_SELECTOR,
                             checkbox_input_xpath=TERMS_CHECKBOX_INPUT,
@@ -719,7 +710,7 @@ def has_desired_structure(text):
     return False
 
 # -------------------------
-# Main function updated: copy profile to temp, wait for button enabled, poll recaptcha token
+# Main with forced --load-extension from detected extension folder
 # -------------------------
 def run_selenium_task(valor,
                       target_url=TARGET_URL,
@@ -736,6 +727,7 @@ def run_selenium_task(valor,
     logger.info("Inicio de tarea Selenium para valor: %s", valor)
     display = None
     tmp_profile_copy_path = None
+    extra_load_extension = None
     try:
         display_var = os.environ.get('DISPLAY')
         if not VISIBLE and not display_var:
@@ -750,8 +742,6 @@ def run_selenium_task(valor,
 
         chrome_options = Options()
 
-        # Profile handling: prefer EXT_USER_DATA_DIR if valid, else use repo chrome_profile_copy/Profile 2,
-        # but COPY it to a temporary dir per-run to avoid "already in use" lock.
         repo_root = Path(__file__).parent.resolve()
         desired_profile = repo_root / "chrome_profile_copy" / "Profile 2"
         env_user_data = os.environ.get("EXT_USER_DATA_DIR", "").strip()
@@ -781,7 +771,6 @@ def run_selenium_task(valor,
             else:
                 logger.warning("[PROFILE] No se encontró carpeta 'Profile 2' en chrome_profile_copy: %s", desired_profile)
 
-        # If we have an orig_user_data_dir, copy it to a temporary directory and use that copy for --user-data-dir
         if orig_user_data_dir:
             try:
                 tmp_dir = Path(tempfile.mkdtemp(prefix="chrome_profile_copy_"))
@@ -792,11 +781,25 @@ def run_selenium_task(valor,
                         shutil.copytree(item, dest, symlinks=False, dirs_exist_ok=True)
                     else:
                         shutil.copy2(item, dest)
-                chrome_options.add_argument(f'--user-data-dir={str(tmp_profile_copy_path)}')
                 logger.info("Se encontró Profile 2 y se creó copia temporal en: %s", tmp_profile_copy_path)
                 found_ext, ext_details = detect_capsolver_in_profile(tmp_profile_copy_path)
                 if found_ext:
                     logger.info("[PROFILE] Extensión Captcha Solver detectada en la copia del profile. Detalles: %s", ext_details)
+                    # Forzar carga unpacked de la extensión encontrada: buscar ruta a la carpeta de la versión encontrada
+                    # elegimos la primera coincidencia con match_keyword
+                    chosen = ext_details[0]
+                    ext_id = chosen.get("id")
+                    ver_dir = chosen.get("version_dir")
+                    # comprobar la ruta probable: Extensions/<ext_id>/<ver_dir>
+                    candidate_ext_path = tmp_profile_copy_path / "Extensions" / ext_id / ver_dir
+                    if not candidate_ext_path.exists():
+                        # también puede estar en Default/Extensions
+                        candidate_ext_path = tmp_profile_copy_path / "Default" / "Extensions" / ext_id / ver_dir
+                    if candidate_ext_path.exists() and candidate_ext_path.is_dir():
+                        extra_load_extension = str(candidate_ext_path)
+                        logger.info("[PROFILE] Forzando --load-extension=%s", extra_load_extension)
+                    else:
+                        logger.warning("[PROFILE] No se encontró la carpeta unpacked de la extensión en la copia temporal (no se añadirá --load-extension).")
                 else:
                     if ext_details:
                         logger.info("[PROFILE] Se inspeccionó la copia del profile; no se detectó Captcha Solver explícitamente. Entradas encontradas: %d", len(ext_details))
@@ -812,6 +815,19 @@ def run_selenium_task(valor,
                 tmp_profile_copy_path = None
         else:
             logger.info("[PROFILE] No se usará profile; Chrome arrancará con perfil limpio (no hay Profile 2)")
+
+        # Añadir user-data-dir a opciones (si existe copia temporal)
+        if tmp_profile_copy_path:
+            chrome_options.add_argument(f'--user-data-dir={str(tmp_profile_copy_path)}')
+            logger.info("[PROFILE] Añadido --user-data-dir=%s", tmp_profile_copy_path)
+        # Forzar carga de extension si detectada
+        if extra_load_extension:
+            # chrome no permite cargar una extensión crx - pero si la carpeta unpacked existe
+            try:
+                chrome_options.add_argument(f'--load-extension={extra_load_extension}')
+                logger.info("[PROFILE] Añadido flag --load-extension apuntando a: %s", extra_load_extension)
+            except Exception:
+                logger.exception("[PROFILE] Error añadiendo --load-extension:")
 
         # chrome options baseline
         chrome_options.add_experimental_option("detach", True)
@@ -835,7 +851,7 @@ def run_selenium_task(valor,
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         chrome_options.add_argument('--window-size=1920,1080')
 
-        # WebDriver: try system chromedriver first, else webdriver_manager
+        # WebDriver selection as before
         possible_system_paths = [
             "/usr/local/bin/chromedriver",
             "/usr/bin/chromedriver",
@@ -900,7 +916,7 @@ def run_selenium_task(valor,
         except Exception:
             pass
 
-        # Check chrome://version to see if user-data-dir is used
+        # Check chrome://version
         try:
             time.sleep(0.5)
             try:
@@ -918,7 +934,6 @@ def run_selenium_task(valor,
         except Exception:
             logger.exception("[PROFILE] Error comprobando chrome://version:")
 
-        # Credentials
         USER = os.environ.get("MI_SITIO_USER")
         PASS = os.environ.get("MI_SITIO_PASS")
         if not USER or not PASS:
@@ -973,7 +988,6 @@ def run_selenium_task(valor,
         if not MANUAL_INTERACTION:
             by_btn, sel_btn = resolve_locator(button_selector)
 
-            # poll to wait until the button is enabled (remove disabled attribute / aria-disabled false)
             button_wait_deadline = time.time() + 30  # wait up to 30s for button to enable
             btn_elem = None
             while time.time() < button_wait_deadline:
@@ -1033,7 +1047,7 @@ def run_selenium_task(valor,
                     aria_disabled = None
 
                 if (disabled_attr not in (None, "", "false")) or (aria_disabled is not None and aria_disabled.lower() == "true"):
-                    logger.info("Botón encontrado pero sigue disabled. Comprobando reCAPTCHA y esperando habilitación (hasta 60s)...")
+                    logger.info("Botón encontrado pero sigue disabled. Comprobando reCAPTCHA y esperando habilitación (hasta 90s)...")
                     try:
                         recaptcha_iframes = driver.find_elements(By.CSS_SELECTOR, "iframe[src*='recaptcha'], iframe[src*='google.com/recaptcha'], iframe[src*='gstatic.com/recaptcha']")
                         num_rec = len(recaptcha_iframes)
@@ -1041,7 +1055,7 @@ def run_selenium_task(valor,
                         num_rec = 0
                     logger.info("[DIAG] Iframes recaptcha detectados: %d", num_rec)
 
-                    rec_max_wait = 60
+                    rec_max_wait = 90  # más tiempo para que la extensión tenga chance
                     rec_deadline = time.time() + rec_max_wait
                     token = None
                     while time.time() < rec_deadline:
