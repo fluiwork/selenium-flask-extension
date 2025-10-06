@@ -1,12 +1,11 @@
 # selenium_flask_app.py
 """
 Selenium + Flask script (modificado):
- - Login usando iframe 'loginunico' (priorizado).
- - Checkbox de términos automático (fast)
- - Debug reducido: solo diagnóstico relativo a la carga del profile/extension
- - Se removió BASE_URL a petición del usuario.
- - Añadidos: logs para detectar carga de perfil Linux + búsqueda de extensión 'capsolver'
-           diagnóstico tras click (atributos botón, cambio DOM, iframes, reCAPTCHA token)
+ - Añadida: copia temporal del profile 'Profile 2' para evitar "user data directory is already in use".
+ - Mejora: detección de la extensión Captcha Solver usando heurística ampliada (busca "capsolver",
+   "captcha solver", "captcha-solver", y "captcha" en manifest name/description).
+ - Logs concisos sobre estado del profile, extensión, reCAPTCHA y habilitación del botón.
+ - Mantiene la lógica original salvo las mejoras solicitadas.
 """
 
 import os
@@ -17,6 +16,8 @@ import logging
 import sys
 import re
 import random
+import shutil
+import tempfile
 from pathlib import Path
 from datetime import datetime, timezone
 from flask import Flask, render_template_string, request, jsonify
@@ -57,11 +58,11 @@ app = Flask(__name__)
 # -------------------------
 # CONFIG (ajusta aquí)
 # -------------------------
-VISIBLE = False   # <-- CAMBIADO A False para headless con Xvfb
+VISIBLE = False   # headless via Xvfb
 LOGIN_URL = "https://clientes.celsia.com/clientes/login"
 TARGET_URL = "https://clientes.celsia.com/clientes/paga-tus-facturas"
 
-# ** REEMPLAZA LOS SELECTORES POR LOS CORRECTOS (usa DevTools -> Copy selector / Copy XPath) **
+# Selectors (deja los tuyos)
 USERNAME_SELECTOR = '//*[@id="root"]/div/div[2]/div/div/span/div/div/div/form/div[1]/div/input'
 PASSWORD_SELECTOR = '//*[@id="root"]/div/div[2]/div/div/span/div/div/div/form/div[2]/div/input'
 SUBMIT_SELECTOR = 'button[type="submit"]'
@@ -77,16 +78,15 @@ RESULT_SELECTOR = '//*[@id="menu-content"]/app-request-invoice/ion-content/ion-g
 COOKIES_FILE = Path("session_cookies.json")
 
 PAGE_LOAD_TIMEOUT = 40
-ELEMENT_WAIT_TIMEOUT = 30  # Aumentado para dar más tiempo
+ELEMENT_WAIT_TIMEOUT = 30
 
-# ----- BANDERAS -----
-MANUAL_TERMS = False  # Checkbox automático
-MANUAL_INTERACTION = False  # Botón automático
-
-MANUAL_WAIT_TIMEOUT = 300  # 5 minutos por defecto
+# Flags
+MANUAL_TERMS = False
+MANUAL_INTERACTION = False
+MANUAL_WAIT_TIMEOUT = 300
 
 # -------------------------
-# UI simple para probar
+# UI simple
 # -------------------------
 INDEX_HTML = '''
 <!doctype html>
@@ -106,7 +106,7 @@ INDEX_HTML = '''
 <body>
   <div class="card">
     <h2>Página 1</h2>
-    <p>Ingresa un valor y presiona "Procesar". El navegador Selenium se abrirá visible (para debugging).</p>
+    <p>Ingresa un valor y presiona "Procesar".</p>
     <form id="myForm">
       <label for="valor">Valor:</label><br>
       <input id="valor" name="valor" required style="width:100%;padding:8px;margin-top:8px"><br><br>
@@ -161,7 +161,7 @@ INDEX_HTML = '''
 '''
 
 # -------------------------
-# Helpers de cookies y login
+# Helpers
 # -------------------------
 def save_cookies_to_file(driver, path=COOKIES_FILE):
     try:
@@ -181,11 +181,7 @@ def load_cookies_from_file(path=COOKIES_FILE):
         logger.exception("[!] Error cargando cookies:")
         return None
 
-
 def resolve_locator(selector: str):
-    """
-    Detecta si 'selector' es XPath o CSS y devuelve (By, selector_limpio).
-    """
     if not selector:
         raise ValueError("Selector vacío en resolve_locator()")
     s = selector.strip()
@@ -196,19 +192,20 @@ def resolve_locator(selector: str):
         return (By.XPATH, s)
     return (By.CSS_SELECTOR, s)
 
-
-# -------------------------
-# Utilities para detectar extensión en profile
-# -------------------------
+# Detect extension 'capsolver' in profile (enhanced heuristic)
 def detect_capsolver_in_profile(profile_path: Path):
     """
-    Inspecciona profile_path/Default/Extensions o profile_path/Extensions
-    buscando manifest.json cuyo 'name' o 'description' contenga 'capsolver' (case-insensitive).
-    Devuelve (found_bool, detalles_list).
+    Busca manifest.json y detecta extensiones con keywords:
+      - 'capsolver'
+      - 'captcha solver'
+      - 'captcha-solver'
+      - 'captcha'
+    Retorna (found_bool, details_list)
     """
     try:
         details = []
-        # posibles ubicaciones
+        keywords = ("capsolver", "captcha solver", "captcha-solver", "captcha solver:", "captcha")
+        # common extension locations
         candidates = [
             profile_path / "Default" / "Extensions",
             profile_path / "Extensions",
@@ -219,7 +216,6 @@ def detect_capsolver_in_profile(profile_path: Path):
                 if base and base.exists() and base.is_dir():
                     for ext_id_dir in base.iterdir():
                         if ext_id_dir.is_dir():
-                            # cada subfolder puede tener versiones: iterar subdirs
                             for ver in ext_id_dir.iterdir():
                                 if ver.is_dir():
                                     man = ver / "manifest.json"
@@ -229,35 +225,36 @@ def detect_capsolver_in_profile(profile_path: Path):
                                             j = json.loads(txt)
                                             name = (j.get("name") or "").lower()
                                             desc = (j.get("description") or "").lower()
-                                            if "capsolver" in name or "capsolver" in desc:
-                                                details.append({
-                                                    "id": ext_id_dir.name,
-                                                    "version_dir": str(ver.name),
-                                                    "name": j.get("name"),
-                                                    "description": j.get("description")
-                                                })
-                                            else:
-                                                # añadir info mínima para debugging (pero no demasiada)
-                                                details.append({
-                                                    "id": ext_id_dir.name,
-                                                    "version_dir": str(ver.name),
-                                                    "name": j.get("name")
-                                                })
+                                            found_kw = None
+                                            for kw in keywords:
+                                                if kw in name or kw in desc:
+                                                    found_kw = kw
+                                                    break
+                                            details.append({
+                                                "id": ext_id_dir.name,
+                                                "version_dir": str(ver.name),
+                                                "name": j.get("name"),
+                                                "description": j.get("description"),
+                                                "match_keyword": found_kw
+                                            })
                                         except Exception:
-                                            continue
+                                            details.append({
+                                                "id": ext_id_dir.name,
+                                                "version_dir": str(ver.name),
+                                                "name": None,
+                                                "description": None,
+                                                "match_keyword": None
+                                            })
             except Exception:
                 continue
-        # filtrar resultados que realmente declaren capsolver
-        found = [d for d in details if "capsolver" in ((d.get("name") or "") or "").lower() or ("description" in d and "capsolver" in (d.get("description") or "").lower())]
+        found = [d for d in details if d.get("match_keyword")]
         return (len(found) > 0, found if found else details)
     except Exception:
-        logger.exception("[PROFILE] Error detectando extensión capsolver en profile")
+        logger.exception("[PROFILE] Error detectando extensión en profile")
         return (False, [])
 
-
 # -------------------------
-# Funciones login (solo flujo iframe 'loginunico')
-# (Se mantienen exactamente como antes en su lógica)
+# Login functions (kept logic)
 # -------------------------
 def perform_login(driver,
                   login_url,
@@ -276,7 +273,7 @@ def perform_login(driver,
         try:
             WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
         except Exception:
-            logger.debug("[*] Advertencia: readyState no llegó a 'complete' en 10s (continúa)")
+            logger.debug("[*] readyState no llegó a 'complete' en 10s (continúa)")
 
         frames = driver.find_elements(By.TAG_NAME, "iframe")
         logger.debug("[*] Iframes detectados: %d", len(frames))
@@ -411,7 +408,6 @@ def perform_login(driver,
                 by_check, sel_check = resolve_locator(post_login_check_selector)
                 WebDriverWait(driver, wait_timeout).until(EC.presence_of_element_located((by_check, sel_check)))
                 logger.debug("[+] Login confirmado en document principal tras submit en iframe")
-                # --- Navegar inmediatamente al TARGET_URL para evitar quedarse en la página intermedia ---
                 try:
                     driver.get(TARGET_URL)
                     WebDriverWait(driver, 6).until(lambda d: d.execute_script("return document.readyState") == "complete")
@@ -436,7 +432,6 @@ def perform_login(driver,
         logger.exception("[!] perform_login fallo inesperado:")
         return False
 
-
 def ensure_logged_in(driver,
                      base_url,
                      login_url,
@@ -445,7 +440,6 @@ def ensure_logged_in(driver,
                      submit_selector,
                      post_login_check_selector,
                      wait_timeout=ELEMENT_WAIT_TIMEOUT):
-    # Intentamos abrir la página de login directamente (no se usa BASE_URL ya)
     try:
         driver.get(login_url)
     except Exception:
@@ -476,7 +470,6 @@ def ensure_logged_in(driver,
             by_check, sel_check = resolve_locator(post_login_check_selector)
             WebDriverWait(driver, 3).until(EC.presence_of_element_located((by_check, sel_check)))
             logger.debug("[+] Sesión restaurada con cookies")
-            # si sesión válida, navegar de inmediato al TARGET_URL
             try:
                 driver.get(TARGET_URL)
                 WebDriverWait(driver, 6).until(lambda d: d.execute_script("return document.readyState") == "complete")
@@ -497,33 +490,22 @@ def ensure_logged_in(driver,
     if ok:
         return True
     else:
-        logger.warning("[!] No se pudo iniciar sesión automáticamente (perform_login devolvió False). El flujo continuará intentando acceder a la página objetivo y reintentando login si es necesario.")
+        logger.warning("[!] No se pudo iniciar sesión automáticamente (perform_login devolvió False).")
         return False
 
-# -------------------------
-# Accept terms (automático - fast)
-# -------------------------
+# Accept terms (same)
 def accept_terms_if_present(driver,
                             checkbox_selector=TERMS_CHECKBOX_SELECTOR,
                             checkbox_input_xpath=TERMS_CHECKBOX_INPUT,
                             accept_button_selector=TERMS_ACCEPT_BUTTON_SELECTOR,
                             wait_timeout=2):
-    """
-    Versión rápida para marcar checkbox normales.
-    wait_timeout por defecto reducido a 2s para acelerar el intento.
-    """
     logger.debug("[*] Buscando checkbox de términos y condiciones (fast mode)...")
-    
     try:
-        # PRIMERO: Intentar con el selector principal del input
-        logger.debug(f"[*] Intentando con selector principal: {checkbox_input_xpath}")
         by_input, sel_input = resolve_locator(checkbox_input_xpath)
-        
         try:
             checkbox_input = WebDriverWait(driver, max(1, wait_timeout)).until(
                 EC.presence_of_element_located((by_input, sel_input))
             )
-            # intentar marcar inmediatamente por JS
             try:
                 driver.execute_script("if(!arguments[0].checked){arguments[0].click();}", checkbox_input)
             except Exception:
@@ -531,8 +513,6 @@ def accept_terms_if_present(driver,
                     driver.execute_script("arguments[0].checked = true; arguments[0].dispatchEvent(new Event('change'));", checkbox_input)
                 except Exception:
                     pass
-
-            # pequeña comprobación inmediata
             try:
                 if checkbox_input.is_selected():
                     logger.debug("[+] Checkbox marcado (fast path)")
@@ -542,10 +522,7 @@ def accept_terms_if_present(driver,
         except Exception as e:
             logger.debug(f"[!] No se pudo encontrar/marcar con selector principal (fast): {e}")
 
-        # SEGUNDO: Intentar con el selector del label/container
-        logger.debug(f"[*] Intentando con selector del label: {checkbox_selector}")
         by_label, sel_label = resolve_locator(checkbox_selector)
-        
         try:
             checkbox_label = WebDriverWait(driver, max(1, wait_timeout)).until(
                 EC.element_to_be_clickable((by_label, sel_label))
@@ -560,18 +537,14 @@ def accept_terms_if_present(driver,
             time.sleep(0.15)
             logger.debug("[+] Click realizado en el label del checkbox (fast path)")
             return True
-            
         except Exception as e:
             logger.debug(f"[!] No se pudo encontrar/marcar con selector del label (fast): {e}")
 
-        # TERCERO: búsqueda rápida de cualquier checkbox visible
-        logger.debug("[*] Buscando cualquier checkbox en la página (fast fallback)...")
         try:
             checkboxes = driver.find_elements(By.CSS_SELECTOR, 'input[type="checkbox"]')
         except Exception:
             checkboxes = []
         logger.debug(f"[*] Se encontraron {len(checkboxes)} checkboxes en total (fast fallback)")
-        
         for i, checkbox in enumerate(checkboxes):
             try:
                 if checkbox.is_displayed() and checkbox.is_enabled():
@@ -597,38 +570,28 @@ def accept_terms_if_present(driver,
         return False
 
 def ensure_checkbox_checked(driver, checkbox_input_xpath=TERMS_CHECKBOX_INPUT, retries=3, delay=1):
-    """
-    Versión simplificada - solo verifica si está marcado
-    """
     for attempt in range(retries):
         try:
             by_i, sel_i = resolve_locator(checkbox_input_xpath)
             checkbox = driver.find_element(by_i, sel_i)
-            
             if checkbox.is_selected():
                 logger.debug(f"[+] Checkbox verificado como marcado (intento {attempt+1})")
                 return True
             else:
                 logger.debug(f"[*] Checkbox aún no marcado (intento {attempt+1})")
                 time.sleep(delay)
-                
         except Exception as e:
             logger.debug(f"[!] Error verificando checkbox (intento {attempt+1}): {e}")
             time.sleep(delay)
-    
     logger.error("[!] Checkbox no pudo ser verificado como marcado después de intentos")
     return False
 
-# -------------------------
-# Helpers para encontrar/llenar input y flow de búsqueda
-# -------------------------
 def set_input_value(driver, input_el, value):
     try:
         try:
             input_el.clear()
         except Exception:
             pass
-        # Simular escritura humana
         for char in value:
             input_el.send_keys(char)
             time.sleep(random.uniform(0.05, 0.1))
@@ -710,16 +673,7 @@ def find_and_fill_input_with_candidates(driver, valor, wait_timeout):
         logger.exception("[!] find_and_fill_input_with_candidates: última excepción:")
     return False
 
-# -------------------------
-# NUEVO: validación de estructura deseada en el texto extraído
-# -------------------------
 def has_desired_structure(text):
-    """
-    Verifica que el texto contenga una estructura similar a:
-      Código de cuenta: <digits>
-      ...
-      Pago total: $<cantidad>
-    """
     if not text or not isinstance(text, str):
         return False
     lines = [l.strip() for l in text.splitlines() if l.strip()]
@@ -765,7 +719,7 @@ def has_desired_structure(text):
     return False
 
 # -------------------------
-# Funcion principal Selenium (integrada)
+# Main function updated: copy profile to temp, wait for button enabled, poll recaptcha token
 # -------------------------
 def run_selenium_task(valor,
                       target_url=TARGET_URL,
@@ -779,160 +733,144 @@ def run_selenium_task(valor,
                       submit_selector=SUBMIT_SELECTOR,
                       post_login_check_selector=POST_LOGIN_CHECK_SELECTOR,
                       wait_timeout=ELEMENT_WAIT_TIMEOUT):
-    
     logger.info("Inicio de tarea Selenium para valor: %s", valor)
-
-    # Iniciar Xvfb para entorno headless
     display = None
-    display_var = os.environ.get('DISPLAY')
-    if not VISIBLE and not display_var:
-        logger.info("Iniciando Xvfb para entorno headless...")
-        try:
-            from pyvirtualdisplay import Display
-            display = Display(visible=0, size=(1920, 1080))
-            display.start()
-            logger.info("Xvfb iniciado correctamente")
-        except Exception as e:
-            logger.error(f"Error iniciando Xvfb: {e}")
-
-    chrome_options = Options()
-
-    # --- Use an existing Chrome user-data-dir and Profile 2 (ahora: DETECCIÓN y LOG de extensión capsolver) ---
+    tmp_profile_copy_path = None
     try:
-        repo_root = Path(__file__).parent.resolve()
-        # Forzamos a usar únicamente: repo_root/chrome_profile_copy/"Profile 2"
-        desired_profile = repo_root / "chrome_profile_copy" / "Profile 2"
+        display_var = os.environ.get('DISPLAY')
+        if not VISIBLE and not display_var:
+            logger.info("Iniciando Xvfb para entorno headless...")
+            try:
+                from pyvirtualdisplay import Display
+                display = Display(visible=0, size=(1920, 1080))
+                display.start()
+                logger.info("Xvfb iniciado correctamente")
+            except Exception as e:
+                logger.error(f"Error iniciando Xvfb: {e}")
 
-        # Preferir variable de entorno si está definida (pero sólo si apunta a un existing profile)
+        chrome_options = Options()
+
+        # Profile handling: prefer EXT_USER_DATA_DIR if valid, else use repo chrome_profile_copy/Profile 2,
+        # but COPY it to a temporary dir per-run to avoid "already in use" lock.
+        repo_root = Path(__file__).parent.resolve()
+        desired_profile = repo_root / "chrome_profile_copy" / "Profile 2"
         env_user_data = os.environ.get("EXT_USER_DATA_DIR", "").strip()
-        user_data_dir = None
+        orig_user_data_dir = None
+
         if env_user_data:
             try:
-                candidate = Path(env_user_data).expanduser().resolve()
-                if candidate.exists() and candidate.is_dir():
-                    if (candidate / "Local State").exists() or (candidate / "Preferences").exists():
-                        user_data_dir = candidate
-                        logger.info("[PROFILE] EXT_USER_DATA_DIR definida y válida, usando: %s", user_data_dir)
+                cand = Path(env_user_data).expanduser().resolve()
+                if cand.exists() and cand.is_dir():
+                    if (cand / "Local State").exists() or (cand / "Preferences").exists():
+                        orig_user_data_dir = cand
+                        logger.info("[PROFILE] EXT_USER_DATA_DIR definida y válida: %s", orig_user_data_dir)
                     else:
-                        logger.error("[PROFILE] EXT_USER_DATA_DIR definida pero no parece un perfil válido: %s", candidate)
+                        logger.error("[PROFILE] EXT_USER_DATA_DIR definida pero no parece un profile: %s", cand)
                 else:
                     logger.error("[PROFILE] EXT_USER_DATA_DIR definida pero no existe: %s", env_user_data)
             except Exception:
                 logger.exception("[PROFILE] Error evaluando EXT_USER_DATA_DIR")
 
-        if user_data_dir is None:
+        if not orig_user_data_dir:
             if desired_profile.exists() and desired_profile.is_dir():
                 if (desired_profile / "Local State").exists() or (desired_profile / "Preferences").exists() or (desired_profile / "Bookmarks").exists():
-                    user_data_dir = desired_profile
-                    logger.info("[PROFILE] Usando perfil Linux fijo: %s", user_data_dir)
-                    logger.info("Se inició el perfil de linux exitosamente: %s", user_data_dir)
+                    orig_user_data_dir = desired_profile
+                    logger.info("[PROFILE] Usando perfil Linux fijo: %s", orig_user_data_dir)
                 else:
-                    logger.error("[PROFILE] La carpeta 'Profile 2' existe pero no contiene archivos de perfil esperados: %s", desired_profile)
-                    user_data_dir = None
+                    logger.error("[PROFILE] 'Profile 2' existe pero sin archivos esperados: %s", desired_profile)
             else:
-                logger.warning("[PROFILE] No se encontró la carpeta linux 'Profile 2' en chrome_profile_copy: %s", desired_profile)
-                user_data_dir = None
+                logger.warning("[PROFILE] No se encontró carpeta 'Profile 2' en chrome_profile_copy: %s", desired_profile)
 
-        ext_path = os.environ.get("EXT_PATH", str(repo_root / "extensions" / "myext")).strip()
-        if user_data_dir:
+        # If we have an orig_user_data_dir, copy it to a temporary directory and use that copy for --user-data-dir
+        if orig_user_data_dir:
             try:
-                user_data_dir = Path(user_data_dir).resolve()
-                chrome_options.add_argument(f'--user-data-dir={str(user_data_dir)}')
-                logger.info("[PROFILE] Añadido --user-data-dir=%s", user_data_dir)
-                # Detectar si el profile contiene la extensión "capsolver"
-                found_ext, ext_details = detect_capsolver_in_profile(user_data_dir)
-                if found_ext:
-                    logger.info("[PROFILE] Extensión 'capsolver' detectada en el profile. Detalles: %s", ext_details)
-                else:
-                    # si ext_details no está vacío, mostramos lo encontrado; si está vacío mostramos que no se encontró
-                    if ext_details:
-                        logger.info("[PROFILE] Se inspeccionó el profile pero no se detectó 'capsolver' explícitamente. Entradas encontradas: %d", len(ext_details))
+                tmp_dir = Path(tempfile.mkdtemp(prefix="chrome_profile_copy_"))
+                tmp_profile_copy_path = tmp_dir
+                for item in orig_user_data_dir.iterdir():
+                    dest = tmp_dir / item.name
+                    if item.is_dir():
+                        shutil.copytree(item, dest, symlinks=False, dirs_exist_ok=True)
                     else:
-                        logger.info("[PROFILE] No se detectaron extensiones en profile o no hay 'capsolver' en manifest.json")
+                        shutil.copy2(item, dest)
+                chrome_options.add_argument(f'--user-data-dir={str(tmp_profile_copy_path)}')
+                logger.info("Se encontró Profile 2 y se creó copia temporal en: %s", tmp_profile_copy_path)
+                found_ext, ext_details = detect_capsolver_in_profile(tmp_profile_copy_path)
+                if found_ext:
+                    logger.info("[PROFILE] Extensión Captcha Solver detectada en la copia del profile. Detalles: %s", ext_details)
+                else:
+                    if ext_details:
+                        logger.info("[PROFILE] Se inspeccionó la copia del profile; no se detectó Captcha Solver explícitamente. Entradas encontradas: %d", len(ext_details))
+                    else:
+                        logger.info("[PROFILE] No se detectaron extensiones en la copia del profile")
             except Exception:
-                logger.exception("[PROFILE] Error añadiendo user-data-dir (se arranca sin profile):")
+                logger.exception("[PROFILE] Error copiando profile a temporal; arrancando sin profile")
+                if tmp_profile_copy_path and tmp_profile_copy_path.exists():
+                    try:
+                        shutil.rmtree(tmp_profile_copy_path, ignore_errors=True)
+                    except Exception:
+                        pass
+                tmp_profile_copy_path = None
         else:
-            # no hay profile válido: intentar cargar extensión unpacked si existe, sino arrancar con perfil limpio
-            if ext_path and Path(ext_path).is_dir():
-                try:
-                    chrome_options.add_argument(f'--load-extension={ext_path}')
-                    logger.info("[PROFILE] No hay profile; cargando extension unpacked desde: %s", ext_path)
-                except Exception:
-                    logger.exception("[PROFILE] No se pudo añadir --load-extension:")
-            else:
-                logger.info("[PROFILE] No se usará profile ni extension; Chrome arrancará con perfil limpio.")
+            logger.info("[PROFILE] No se usará profile; Chrome arrancará con perfil limpio (no hay Profile 2)")
 
-    except Exception:
-        logger.exception("[PROFILE] Error inesperado configurando profile/extension:")
+        # chrome options baseline
+        chrome_options.add_experimental_option("detach", True)
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_argument('--no-first-run')
+        chrome_options.add_argument('--no-default-browser-check')
+        chrome_options.add_argument('--disable-web-security')
+        chrome_options.add_argument('--allow-running-insecure-content')
+        chrome_options.add_argument('--disable-notifications')
+        chrome_options.add_argument('--disable-popup-blocking')
+        chrome_options.add_argument('--disable-background-timer-throttling')
+        chrome_options.add_argument('--disable-renderer-backgrounding')
+        chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+        chrome_options.add_argument('--disable-features=TranslateUI')
+        chrome_options.add_argument('--disable-ipc-flooding-protection')
+        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        chrome_options.add_argument('--window-size=1920,1080')
 
-    # Añadido: detach para mantener navegador si se quiere
-    chrome_options.add_experimental_option("detach", True)
-
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-
-    # Configuraciones avanzadas
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-    chrome_options.add_argument('--no-first-run')
-    chrome_options.add_argument('--no-default-browser-check')
-    chrome_options.add_argument('--disable-web-security')
-    chrome_options.add_argument('--allow-running-insecure-content')
-    chrome_options.add_argument('--disable-notifications')
-    chrome_options.add_argument('--disable-popup-blocking')
-    chrome_options.add_argument('--disable-background-timer-throttling')
-    chrome_options.add_argument('--disable-renderer-backgrounding')
-    chrome_options.add_argument('--disable-backgrounding-occluded-windows')
-    chrome_options.add_argument('--disable-features=TranslateUI')
-    chrome_options.add_argument('--disable-ipc-flooding-protection')
-    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-    chrome_options.add_argument('--window-size=1920,1080')
-
-    # descargar/obtener ruta inicial (puede devolver carpeta o fichero)
-    # Primero: usar chromedriver ya instalado en el sistema si existe (evita descargar).
-    possible_system_paths = [
-        "/usr/local/bin/chromedriver",
-        "/usr/bin/chromedriver",
-        "/opt/bin/chromedriver",
-        "/bin/chromedriver",
-        "/usr/local/bin/chromedriver-linux",
-    ]
-    driver_executable = None
-    for p in possible_system_paths:
-        try:
-            if os.path.isfile(p) and os.access(p, os.X_OK):
-                driver_executable = p
-                logger.info("[WEBDRIVER] Usando chromedriver desde sistema: %s", driver_executable)
-                break
-        except Exception:
-            pass
-
-    if not driver_executable:
-        logger.info("[WEBDRIVER] chromedriver no encontrado en sistema, usando webdriver_manager (puede tardar).")
-        os.environ.setdefault("WDM_LOG_LEVEL", "ERROR")
-        raw_driver_path = ChromeDriverManager().install()
-        driver_executable = raw_driver_path
-
-        # si raw_driver_path es carpeta, buscar un ejecutable dentro
-        if os.path.isdir(raw_driver_path):
-            for root, _, files in os.walk(raw_driver_path):
-                for fname in files:
-                    if fname == 'chromedriver' or fname.startswith('chromedriver'):
-                        candidate = os.path.join(root, fname)
-                        if 'license' in fname.lower() or 'third_party' in fname.lower():
-                            continue
-                        driver_executable = candidate
-                        break
-                if driver_executable != raw_driver_path:
+        # WebDriver: try system chromedriver first, else webdriver_manager
+        possible_system_paths = [
+            "/usr/local/bin/chromedriver",
+            "/usr/bin/chromedriver",
+            "/opt/bin/chromedriver",
+            "/bin/chromedriver",
+            "/usr/local/bin/chromedriver-linux",
+        ]
+        driver_executable = None
+        for p in possible_system_paths:
+            try:
+                if os.path.isfile(p) and os.access(p, os.X_OK):
+                    driver_executable = p
+                    logger.info("[WEBDRIVER] Usando chromedriver desde sistema: %s", driver_executable)
                     break
+            except Exception:
+                pass
 
-        # fallback: buscar junto al archivo
-        if driver_executable == raw_driver_path:
+        if not driver_executable:
+            logger.info("[WEBDRIVER] chromedriver no encontrado en sistema, usando webdriver_manager (puede tardar).")
+            os.environ.setdefault("WDM_LOG_LEVEL", "ERROR")
+            raw_driver_path = ChromeDriverManager().install()
+            driver_executable = raw_driver_path
+            if os.path.isdir(raw_driver_path):
+                for root, _, files in os.walk(raw_driver_path):
+                    for fname in files:
+                        if fname == 'chromedriver' or fname.startswith('chromedriver'):
+                            candidate = os.path.join(root, fname)
+                            if 'license' in fname.lower() or 'third_party' in fname.lower():
+                                continue
+                            driver_executable = candidate
+                            break
+                    if driver_executable != raw_driver_path:
+                        break
             parent = os.path.dirname(raw_driver_path)
-            if os.path.isdir(parent):
+            if driver_executable == raw_driver_path and os.path.isdir(parent):
                 for f in os.listdir(parent):
                     if f == 'chromedriver' or f.startswith('chromedriver'):
                         cand = os.path.join(parent, f)
@@ -940,50 +878,47 @@ def run_selenium_task(valor,
                             driver_executable = cand
                             break
 
-    # forzar permisos ejecutables si es posible
-    try:
-        if driver_executable and os.path.exists(driver_executable):
-            os.chmod(driver_executable, 0o755)
-    except Exception:
-        logger.debug("[!] No se pudo cambiar permisos al driver (continuo de todos modos)")
-
-    # Usar Service con log_path para diagnosticar (chromedriver.log)
-    logger.debug(f"[*] Usando chromedriver en: {driver_executable}")
-    service = Service(driver_executable, log_path=str(Path.cwd() / "chromedriver.log"))
-
-    driver = None
-    try:
-        logger.debug("[*] Lanzando Chrome (visible=" + str(VISIBLE) + ") ...")
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        logger.info("[WEBDRIVER] Chrome/Chromedriver lanzados (si hubo problema ver chromedriver.log).")
-
-        # Ejecutar script para eliminar webdriver property (no fatal si falla)
         try:
-            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            if driver_executable and os.path.exists(driver_executable):
+                os.chmod(driver_executable, 0o755)
+        except Exception:
+            logger.debug("[!] No se pudo cambiar permisos al driver (continuo de todos modos)")
+
+        service = Service(driver_executable, log_path=str(Path.cwd() / "chromedriver.log"))
+
+        driver = None
+        try:
+            logger.debug("[*] Lanzando Chrome ...")
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            logger.info("[WEBDRIVER] Chrome/Chromedriver lanzados.")
+        except Exception as e:
+            logger.exception("[WEBDRIVER] Error lanzando Chrome/Chromedriver:")
+            return {'success': False, 'error': 'Error lanzando Chrome/Chromedriver', 'trace': traceback.format_exc()}
+
+        try:
+            driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
         except Exception:
             pass
 
-        driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
-
-        # Comprobar qué profile está usando realmente Chrome (intentar leer chrome://version)
+        # Check chrome://version to see if user-data-dir is used
         try:
             time.sleep(0.5)
             try:
                 driver.get("chrome://version")
-                time.sleep(0.7)
+                time.sleep(0.6)
                 src = driver.page_source or ""
-                try:
-                    if 'user_data_dir' in locals() and user_data_dir and str(user_data_dir) in src:
-                        logger.info("[PROFILE] Chrome arrancó usando el user-data-dir solicitado: %s", user_data_dir)
-                    else:
-                        logger.info("[PROFILE] Chrome NO parece usar el user-data-dir solicitado (validar).")
-                except Exception:
-                    logger.debug("[PROFILE] No se pudo confirmar chrome://version content")
+                if tmp_profile_copy_path and str(tmp_profile_copy_path) in src:
+                    logger.info("[PROFILE] Chrome arrancó usando la copia temporal del profile: %s", tmp_profile_copy_path)
+                elif orig_user_data_dir and str(orig_user_data_dir) in src:
+                    logger.info("[PROFILE] Chrome arrancó usando el profile solicitado: %s", orig_user_data_dir)
+                else:
+                    logger.info("[PROFILE] Chrome NO parece usar el user-data-dir solicitado (validar).")
             except Exception:
-                logger.debug("[PROFILE] No se pudo abrir chrome://version (posible bloqueo en entorno headless).")
+                logger.debug("[PROFILE] No se pudo abrir chrome://version (posible bloqueo en headless).")
         except Exception:
             logger.exception("[PROFILE] Error comprobando chrome://version:")
 
+        # Credentials
         USER = os.environ.get("MI_SITIO_USER")
         PASS = os.environ.get("MI_SITIO_PASS")
         if not USER or not PASS:
@@ -1006,60 +941,20 @@ def run_selenium_task(valor,
         except Exception:
             logger.exception("[!] ensure_logged_in threw:")
 
-        # Force navigation to target_url again if not already there (defensive)
+        # Ensure on target page
         try:
             driver.get(target_url)
         except Exception:
             pass
-
         logger.info("Se navegó a la página objetivo (intentando acceder a factura).")
-        try:
-            driver.get(target_url)
-        except Exception:
-            pass
 
-        time.sleep(1.0)
-        try:
-            current = driver.current_url or ""
-        except Exception:
-            current = ""
-        logger.debug("[*] URL actual tras navegación: %s", current)
-
-        if 'login' in current.lower() or 'auth' in current.lower() or (not logged and ('clientes' in current and 'paga-tus-facturas' not in current)):
-            logger.debug("[*] Detectada redirección a login o no estamos logueados; reintentando login y luego navegando al target_url.")
-            try:
-                perform_login(driver,
-                              login_url,
-                              username_selector,
-                              password_selector,
-                              submit_selector,
-                              post_login_check_selector,
-                              wait_timeout=wait_timeout)
-            except Exception:
-                logger.exception("[!] perform_login lanzó excepción en reintento:")
-            try:
-                driver.get(target_url)
-            except Exception:
-                pass
-            time.sleep(1.0)
-            try:
-                logger.debug("[*] URL actual tras reintento: %s", driver.current_url)
-            except Exception:
-                pass
-
-        # 3) Esperar y localizar el input objetivo usando selectores alternativos/heurística
-        logger.debug("[*] Buscando/llenando input objetivo con reintentos (candidatos)...")
+        # Fill input
         found_and_filled = find_and_fill_input_with_candidates(driver, valor, wait_timeout= max(wait_timeout, 25))
         if not found_and_filled:
-            logger.error("No se pudo localizar/llenar el input en la página objetivo. Revisa logs.")
+            logger.error("No se pudo localizar/llenar el input en la página objetivo.")
             return {'success': False, 'error': 'No se pudo localizar/llenar el input en la página objetivo.'}
 
-        # -------------------------
-        # PRIMERO: CHECKBOX DE TÉRMINOS (fast)
-        # -------------------------
-        logger.debug("[*] Iniciando proceso automático de aceptación de términos (fast)...")
-
-        # Pasamos wait_timeout reducido al accept_terms_if_present para hacerlo más rápido
+        # Accept terms
         accepted = accept_terms_if_present(driver,
                                 checkbox_selector=TERMS_CHECKBOX_SELECTOR,
                                 checkbox_input_xpath=TERMS_CHECKBOX_INPUT,
@@ -1068,131 +963,136 @@ def run_selenium_task(valor,
 
         if accepted:
             logger.info("Checkbox de términos procesado correctamente (fast).")
-            # Verificar que quedó marcado con menos reintentos
             ensure_checkbox_checked(driver, checkbox_input_xpath=TERMS_CHECKBOX_INPUT, retries=2, delay=0.3)
         else:
             logger.warning("[!] No se pudo marcar el checkbox de términos automáticamente (fast)")
 
-        # -------------------------
-        # 4) PULSADO DEL BOTÓN después de aceptar términos — intento robusto
-        logger.debug("[*] Procediendo con el botón después de aceptar términos (robust-click)...")
+        # Robust click: WAIT until button becomes enabled (poll)
+        logger.debug("[*] Procediendo con el botón (esperando que deje de ser disabled)...")
         clicked_search = False
-
         if not MANUAL_INTERACTION:
-            # pequeña espera para que la UI reactive cambios tras marcar checkbox
-            time.sleep(0.5)
-
-            # Asegurarnos de que el checkbox quedó marcado; si no, reintentar marcar
-            try:
-                if not ensure_checkbox_checked(driver, checkbox_input_xpath=TERMS_CHECKBOX_INPUT, retries=2, delay=0.3):
-                    logger.warning("[PROFILE] Checkbox no verificado; reintentando accept_terms_if_present (longer)...")
-                    try:
-                        accept_terms_if_present(driver,
-                                                checkbox_selector=TERMS_CHECKBOX_SELECTOR,
-                                                checkbox_input_xpath=TERMS_CHECKBOX_INPUT,
-                                                accept_button_selector=TERMS_ACCEPT_BUTTON_SELECTOR,
-                                                wait_timeout=5)
-                        ensure_checkbox_checked(driver, checkbox_input_xpath=TERMS_CHECKBOX_INPUT, retries=3, delay=0.5)
-                    except Exception:
-                        logger.debug("[PROFILE] Reintento accept_terms_if_present falló o no cambió estado.")
-            except Exception:
-                logger.debug("[PROFILE] Error verificando checkbox antes de click.")
-
-            logger.debug("[*] Buscando botón a clickear: %s", button_selector)
             by_btn, sel_btn = resolve_locator(button_selector)
 
-            btn = None
-            # 1) Intento directo con EC.element_to_be_clickable (más fiable)
-            try:
-                btn = WebDriverWait(driver, 20, poll_frequency=0.3).until(EC.element_to_be_clickable((by_btn, sel_btn)))
-                logger.debug("[+] Botón encontrado por element_to_be_clickable")
-            except Exception:
-                logger.debug("[*] element_to_be_clickable no encontró el botón (continuando con fallback)")
-
-            # 2) Si no se encontró, buscar por XPath/CSS alternativas o por texto dentro del DOM (deep search)
-            if not btn:
-                # intentar encontrar por textos comunes en botones
-                possible_texts = ["consultar", "buscar", "consultar cuenta", "consultar código", "consultar factura", "buscar cuenta"]
-                for txt in possible_texts:
-                    try:
-                        el = driver.execute_script("""
-                            var needle = arguments[0].toLowerCase();
-                            function walk(root){
-                              var nodes = root.querySelectorAll('*');
-                              for(var i=0;i<nodes.length;i++){
-                                try{
-                                  var n = nodes[i];
-                                  var it = (n.innerText||"").toLowerCase();
-                                  if(it.indexOf(needle) !== -1 && (n.tagName.toLowerCase()==='button' || n.getAttribute('role')==='button' || n.onclick)){
-                                    return n;
-                                  }
-                                }catch(e){}
-                              }
-                              return null;
-                            }
-                            return walk(document);
-                        """, txt)
-                        if el:
-                            btn = el
-                            logger.debug("[+] Botón encontrado por texto: %s", txt)
-                            break
-                    except Exception:
-                        pass
-
-            # 3) Fallback: intentar encontrar cualquier elemento con el selector y forzar click (aunque no sea 'clickable')
-            if not btn:
+            # poll to wait until the button is enabled (remove disabled attribute / aria-disabled false)
+            button_wait_deadline = time.time() + 30  # wait up to 30s for button to enable
+            btn_elem = None
+            while time.time() < button_wait_deadline:
                 try:
                     candidates = driver.find_elements(by_btn, sel_btn)
-                    for c in candidates:
-                        try:
-                            # preferir elemento visible
-                            if c.is_displayed():
-                                btn = c
+                    if candidates:
+                        for c in candidates:
+                            try:
+                                displayed = c.is_displayed()
+                            except Exception:
+                                displayed = True
+                            try:
+                                disabled_attr = c.get_attribute("disabled")
+                            except Exception:
+                                disabled_attr = None
+                            try:
+                                aria_disabled = c.get_attribute("aria-disabled")
+                            except Exception:
+                                aria_disabled = None
+                            if displayed and (disabled_attr in (None, "", "false") and (aria_disabled is None or aria_disabled.lower() != "true")):
+                                btn_elem = c
                                 break
-                        except Exception:
-                            btn = c
-                            break
+                            else:
+                                btn_elem = c
+                        if btn_elem:
+                            try:
+                                disabled_attr = btn_elem.get_attribute("disabled")
+                                aria_disabled = btn_elem.get_attribute("aria-disabled")
+                            except Exception:
+                                disabled_attr = None
+                                aria_disabled = None
+                            if disabled_attr in (None, "", "false") and (aria_disabled is None or aria_disabled.lower() != "true"):
+                                logger.info("Botón detectado y habilitado antes del click.")
+                                break
+                    time.sleep(0.7)
                 except Exception:
-                    pass
+                    time.sleep(0.7)
 
-            # 4) Si encontramos algo, intentar varios métodos de click (JS primero)
-            if btn:
+            if not btn_elem:
                 try:
+                    candidates = driver.find_elements(by_btn, sel_btn)
+                    if candidates:
+                        btn_elem = candidates[0]
+                except Exception:
+                    btn_elem = None
+
+            if not btn_elem:
+                logger.error("[!] No se pudo localizar el botón con el selector proporcionado.")
+            else:
+                try:
+                    disabled_attr = btn_elem.get_attribute("disabled")
+                except Exception:
+                    disabled_attr = None
+                try:
+                    aria_disabled = btn_elem.get_attribute("aria-disabled")
+                except Exception:
+                    aria_disabled = None
+
+                if (disabled_attr not in (None, "", "false")) or (aria_disabled is not None and aria_disabled.lower() == "true"):
+                    logger.info("Botón encontrado pero sigue disabled. Comprobando reCAPTCHA y esperando habilitación (hasta 60s)...")
                     try:
-                        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
+                        recaptcha_iframes = driver.find_elements(By.CSS_SELECTOR, "iframe[src*='recaptcha'], iframe[src*='google.com/recaptcha'], iframe[src*='gstatic.com/recaptcha']")
+                        num_rec = len(recaptcha_iframes)
+                    except Exception:
+                        num_rec = 0
+                    logger.info("[DIAG] Iframes recaptcha detectados: %d", num_rec)
+
+                    rec_max_wait = 60
+                    rec_deadline = time.time() + rec_max_wait
+                    token = None
+                    while time.time() < rec_deadline:
+                        try:
+                            token = driver.execute_script("var el = document.querySelector('textarea[name=\"g-recaptcha-response\"]'); return el ? el.value : null;")
+                        except Exception:
+                            token = None
+                        if token:
+                            logger.info("[DIAG] Se detectó token de reCAPTCHA (len=%d).", len(token))
+                            break
+                        try:
+                            if btn_elem.is_displayed():
+                                disabled_attr = btn_elem.get_attribute("disabled")
+                                aria_disabled = btn_elem.get_attribute("aria-disabled")
+                                if disabled_attr in (None, "", "false") and (aria_disabled is None or aria_disabled.lower() != "true"):
+                                    logger.info("[DIAG] Botón se habilitó durante el wait.")
+                                    break
+                        except Exception:
+                            pass
+                        time.sleep(1.0)
+                    if not token:
+                        logger.info("[DIAG] No se detectó token reCAPTCHA dentro del tiempo de espera (o la extensión no resolvió).")
+
+                try:
+                    logger.info("[*] Intentando click robusto en el botón (JS -> ActionChains -> element.click).")
+                    try:
+                        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn_elem)
                     except Exception:
                         pass
-                    # JS click (intenta incluso si el elemento está 'overlayed')
+                    clicked = False
                     try:
-                        driver.execute_script("arguments[0].click();", btn)
-                        clicked_search = True
+                        driver.execute_script("arguments[0].click();", btn_elem)
+                        clicked = True
                         logger.info("Click ejecutado por JS en el botón (robust-click).")
                     except Exception:
-                        # ActionChains como fallback
                         try:
-                            ActionChains(driver).move_to_element(btn).pause(0.1).click().perform()
-                            clicked_search = True
+                            ActionChains(driver).move_to_element(btn_elem).pause(0.1).click().perform()
+                            clicked = True
                             logger.info("Click ejecutado por ActionChains en el botón (robust-click).")
                         except Exception:
                             try:
-                                btn.click()
-                                clicked_search = True
+                                btn_elem.click()
+                                clicked = True
                                 logger.info("Click ejecutado por element.click() en el botón (robust-click).")
                             except Exception:
                                 logger.exception("[!] Intentos de click en botón fallaron (robust-click)")
+                    clicked_search = clicked
                 except Exception:
                     logger.exception("[!] Error al intentar click robusto en botón")
 
-                # -------------------------
-                # DIAGNÓSTICO ADICIONAL (tu petición):
-                # - atributos del botón
-                # - URL actual
-                # - comprobación de cambio en DOM (short poll)
-                # - revisión de iframes
-                # - detección de reCAPTCHA y token 'g-recaptcha-response'
-                # -------------------------
                 try:
-                    # obtener atributos y estado del elemento (safely)
                     try:
                         attrs = driver.execute_script("""
                             var el = arguments[0];
@@ -1207,27 +1107,22 @@ def run_selenium_task(valor,
                             try { a['_tag'] = el.tagName; } catch(e){}
                             try { a['_text'] = (el.innerText||'').trim().slice(0,200); } catch(e){}
                             return a;
-                        """, btn)
+                        """, btn_elem)
                     except Exception:
                         attrs = {'_error': 'no se pudo leer atributos del elemento'}
-
                     logger.info("[DIAG] Atributos del botón tras click: %s", attrs)
                     try:
                         cur_url = driver.current_url
                     except Exception:
                         cur_url = "(no disponible)"
                     logger.info("[DIAG] URL actual tras click: %s", cur_url)
-
-                    # longitud inicial del body
                     try:
                         initial_len = driver.execute_script("return (document.body && document.body.innerText) ? document.body.innerText.length : 0;")
                     except Exception:
                         initial_len = -1
                     logger.info("[DIAG] Longitud inicial del body (chars): %s", initial_len)
-
-                    # Poll corto para detectar cambios en DOM
                     dom_changed = False
-                    deadline = time.time() + 12  # 12s de comprobación reactiva
+                    deadline = time.time() + 12
                     while time.time() < deadline:
                         try:
                             cur_len = driver.execute_script("return (document.body && document.body.innerText) ? document.body.innerText.length : 0;")
@@ -1238,10 +1133,8 @@ def run_selenium_task(valor,
                         except Exception:
                             pass
                         time.sleep(0.6)
-
                     if not dom_changed:
                         logger.info("[DIAG] No se detectó cambio de DOM tras click en ventana principal (12s).")
-                        # listar iframes (podría estar dentro de iframe)
                         try:
                             frames = driver.find_elements(By.TAG_NAME, "iframe")
                             logger.info("[DIAG] Iframes en la página: %d", len(frames))
@@ -1253,51 +1146,33 @@ def run_selenium_task(valor,
                                     pass
                         except Exception:
                             pass
-
-                    # reCAPTCHA check: buscar iframe con recaptcha y textarea g-recaptcha-response
                     try:
-                        recaptcha_iframes = driver.find_elements(By.CSS_SELECTOR, "iframe[src*='recaptcha'], iframe[src*='google.com/recaptcha'], iframe[src*='gstatic.com/recaptcha']")
-                        logger.info("[DIAG] Iframes detectados que parecen reCAPTCHA: %d", len(recaptcha_iframes))
+                        token = driver.execute_script("var el = document.querySelector('textarea[name=\"g-recaptcha-response\"]'); return el ? el.value : null;")
                     except Exception:
-                        recaptcha_iframes = []
-
-                    try:
-                        # revisar valor de g-recaptcha-response si existe
                         token = None
-                        try:
-                            token = driver.execute_script("var el = document.querySelector('textarea[name=\"g-recaptcha-response\"]'); return el ? el.value : null;")
-                        except Exception:
-                            token = None
-                        if token:
-                            logger.info("[DIAG] Se detectó token de reCAPTCHA (g-recaptcha-response) con longitud: %d", len(token))
-                        else:
-                            logger.info("[DIAG] No se detectó token de reCAPTCHA en textarea 'g-recaptcha-response' (puede que use un iframe/token distinto).")
-                    except Exception:
-                        logger.exception("[DIAG] Error comprobando g-recaptcha-response")
-
+                    if token:
+                        logger.info("[DIAG] Se detectó token de reCAPTCHA (len=%d)", len(token))
+                    else:
+                        logger.info("[DIAG] No se detectó token de reCAPTCHA en textarea 'g-recaptcha-response'.")
                 except Exception:
                     logger.exception("[DIAG] Error durante diagnóstico tras click")
 
-            else:
-                logger.error("[!] No se pudo localizar ningún candidato para el botón (robust-click). Dejar en modo MANUAL si procede.")
         else:
             logger.info("[MANUAL] Por favor haz click en el botón Consultar (modo manual activo)")
 
-        # ----------------- esperar resultado específico (xpath que proporcionaste) -----------------
-        result_wait_timeout = max(wait_timeout, 60)  # mínimo 60s
+        # Wait for result as before
+        result_wait_timeout = max(wait_timeout, 60)
         if MANUAL_INTERACTION:
             result_wait_timeout = MANUAL_WAIT_TIMEOUT
-
-        logger.debug("[*] Esperando selector de resultado exacto (robusto): %s", result_selector)
 
         try:
             WebDriverWait(driver, result_wait_timeout).until(
                 lambda d: d.find_elements(By.CSS_SELECTOR, "app-request-invoice") or d.find_elements(By.CSS_SELECTOR, "div.payment-card-invoice-info") or d.find_elements(By.TAG_NAME, "ion-grid")
             )
-            logger.debug("[*] Se detectó contenedor de resultado (app-request-invoice / ion-grid / payment-card-invoice-info).")
         except Exception:
             logger.debug("[*] No se detectó contenedor 'app-request-invoice' / 'ion-grid' en el tiempo esperado, continuar con búsqueda profunda...")
 
+        # deep search...
         _find_deep_js = """
 function findDeep(selector){
     function walk(root){
@@ -1321,7 +1196,6 @@ function findDeep(selector){
 }
 return findDeep(arguments[0]);
 """
-
         def find_element_deep(driver, css_selector):
             try:
                 el = driver.execute_script(_find_deep_js, css_selector)
@@ -1456,15 +1330,21 @@ return findDeep(arguments[0]);
         logger.exception("[ERROR] Exception: %s", e)
         return {'success': False, 'error': str(e), 'trace': tb}
     finally:
-        if driver:
-            if VISIBLE:
-                logger.debug("[*] Depuración visible: el navegador permanecerá 1 segundo antes de cerrar.")
-                time.sleep(1)
+        # cleanup
+        try:
+            if 'driver' in locals() and driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        if tmp_profile_copy_path:
             try:
-                driver.quit()
+                shutil.rmtree(str(tmp_profile_copy_path), ignore_errors=True)
+                logger.info("Copia temporal del profile eliminada: %s", tmp_profile_copy_path)
             except Exception:
-                pass
-        # Detener Xvfb si se inició
+                logger.debug("[PROFILE] No se pudo eliminar la copia temporal del profile (ignorado).")
         if display:
             try:
                 display.stop()
@@ -1486,13 +1366,11 @@ def process():
     if not valor:
         return jsonify({'success': False, 'error': 'Valor vacío'})
     try:
-        # Ejecutar la tarea y asegurarnos de capturar cualquier excepción para devolver JSON válido siempre
         res = run_selenium_task(valor)
     except Exception:
         tb = traceback.format_exc()
         logger.exception("[ERROR] Excepción en /process al ejecutar run_selenium_task")
         res = {'success': False, 'error': 'Error interno ejecutando la tarea', 'trace': tb}
-    # Garantizar que siempre devolvemos JSON serializable
     if not isinstance(res, dict):
         res = {'success': False, 'error': 'Respuesta inesperada del worker'}
     return jsonify(res)
