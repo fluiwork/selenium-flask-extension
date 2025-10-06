@@ -743,7 +743,7 @@ def run_selenium_task(valor,
         # -------------------------
         repo_root = Path(__file__).parent.resolve()
         # Forzamos a usar únicamente: repo_root/chrome_profile_copy/"profile 2"
-        desired_profile = repo_root / "chrome_profile_copy" / "profile 2"
+        desired_profile = repo_root / "chrome_profile_copy" / "Profile 2"
 
         # Preferir variable de entorno si está definida (pero solo si apunta a un existing linux profile)
         env_user_data = os.environ.get("EXT_USER_DATA_DIR", "").strip()
