@@ -5,6 +5,8 @@ Selenium + Flask script (modificado):
  - Checkbox de términos automático (fast)
  - Debug reducido: solo diagnóstico relativo a la carga del profile/extension
  - Se removió BASE_URL a petición del usuario.
+ - Añadidos: logs para detectar carga de perfil Linux + búsqueda de extensión 'capsolver'
+           diagnóstico tras click (atributos botón, cambio DOM, iframes, reCAPTCHA token)
 """
 
 import os
@@ -36,14 +38,13 @@ except Exception:
     pass
 
 # -------------------------
-# Logging (mínimo: solo ERROR/CRITICAL y excepciones con traza)
+# Logging (INFO para estados)
 # -------------------------
-# Cambiado a INFO para que se muestren los mensajes de estado solicitados.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Silenciar módulos muy verbosos para dejar solo ERROR/CRITICAL
+# Silenciar módulos muy verbosos
 for name in ("selenium", "urllib3", "webdrivermanager", "webdriver_manager", "werkzeug", "http.client", "chardet"):
     try:
         logging.getLogger(name).setLevel(logging.ERROR)
@@ -195,8 +196,68 @@ def resolve_locator(selector: str):
         return (By.XPATH, s)
     return (By.CSS_SELECTOR, s)
 
+
+# -------------------------
+# Utilities para detectar extensión en profile
+# -------------------------
+def detect_capsolver_in_profile(profile_path: Path):
+    """
+    Inspecciona profile_path/Default/Extensions o profile_path/Extensions
+    buscando manifest.json cuyo 'name' o 'description' contenga 'capsolver' (case-insensitive).
+    Devuelve (found_bool, detalles_list).
+    """
+    try:
+        details = []
+        # posibles ubicaciones
+        candidates = [
+            profile_path / "Default" / "Extensions",
+            profile_path / "Extensions",
+            profile_path
+        ]
+        for base in candidates:
+            try:
+                if base and base.exists() and base.is_dir():
+                    for ext_id_dir in base.iterdir():
+                        if ext_id_dir.is_dir():
+                            # cada subfolder puede tener versiones: iterar subdirs
+                            for ver in ext_id_dir.iterdir():
+                                if ver.is_dir():
+                                    man = ver / "manifest.json"
+                                    if man.exists():
+                                        try:
+                                            txt = man.read_text(encoding='utf-8', errors='ignore')
+                                            j = json.loads(txt)
+                                            name = (j.get("name") or "").lower()
+                                            desc = (j.get("description") or "").lower()
+                                            if "capsolver" in name or "capsolver" in desc:
+                                                details.append({
+                                                    "id": ext_id_dir.name,
+                                                    "version_dir": str(ver.name),
+                                                    "name": j.get("name"),
+                                                    "description": j.get("description")
+                                                })
+                                            else:
+                                                # añadir info mínima para debugging (pero no demasiada)
+                                                details.append({
+                                                    "id": ext_id_dir.name,
+                                                    "version_dir": str(ver.name),
+                                                    "name": j.get("name")
+                                                })
+                                        except Exception:
+                                            continue
+            except Exception:
+                continue
+        # filtrar resultados que realmente declaren capsolver
+        found = [d for d in details if "capsolver" in ((d.get("name") or "") or "").lower() or ("description" in d and "capsolver" in (d.get("description") or "").lower())]
+        return (len(found) > 0, found if found else details)
+    except Exception:
+        logger.exception("[PROFILE] Error detectando extensión capsolver en profile")
+        return (False, [])
+
+
 # -------------------------
 # Funciones login (solo flujo iframe 'loginunico')
+# (Se mantienen exactamente como antes en su lógica)
 # -------------------------
 def perform_login(driver,
                   login_url,
@@ -654,7 +715,7 @@ def find_and_fill_input_with_candidates(driver, valor, wait_timeout):
 # -------------------------
 def has_desired_structure(text):
     """
-    Verifica que eltexto contenga una estructura similar a:
+    Verifica que el texto contenga una estructura similar a:
       Código de cuenta: <digits>
       ...
       Pago total: $<cantidad>
@@ -736,24 +797,19 @@ def run_selenium_task(valor,
 
     chrome_options = Options()
 
-    # --- Use an existing Chrome user-data-dir and Profile 2 ---
+    # --- Use an existing Chrome user-data-dir and Profile 2 (ahora: DETECCIÓN y LOG de extensión capsolver) ---
     try:
-        # -------------------------
-        # Configuración de profile / extensión (AHORA: solo buscar perfil Linux específico "profile 2")
-        # -------------------------
         repo_root = Path(__file__).parent.resolve()
-        # Forzamos a usar únicamente: repo_root/chrome_profile_copy/"profile 2"
+        # Forzamos a usar únicamente: repo_root/chrome_profile_copy/"Profile 2"
         desired_profile = repo_root / "chrome_profile_copy" / "Profile 2"
 
-        # Preferir variable de entorno si está definida (pero solo si apunta a un existing linux profile)
+        # Preferir variable de entorno si está definida (pero sólo si apunta a un existing profile)
         env_user_data = os.environ.get("EXT_USER_DATA_DIR", "").strip()
         user_data_dir = None
         if env_user_data:
             try:
                 candidate = Path(env_user_data).expanduser().resolve()
-                # sólo aceptar si existe y parece Linux (heurística)
                 if candidate.exists() and candidate.is_dir():
-                    # heurística mínima de linux: si contiene "Local State" o "Preferences"
                     if (candidate / "Local State").exists() or (candidate / "Preferences").exists():
                         user_data_dir = candidate
                         logger.info("[PROFILE] EXT_USER_DATA_DIR definida y válida, usando: %s", user_data_dir)
@@ -764,30 +820,35 @@ def run_selenium_task(valor,
             except Exception:
                 logger.exception("[PROFILE] Error evaluando EXT_USER_DATA_DIR")
 
-        # Si no se usó la variable de entorno, usamos exclusivamente "profile 2" dentro de chrome_profile_copy
         if user_data_dir is None:
             if desired_profile.exists() and desired_profile.is_dir():
-                # mínima validación heurística: debe contener archivos típicos de profile Linux
                 if (desired_profile / "Local State").exists() or (desired_profile / "Preferences").exists() or (desired_profile / "Bookmarks").exists():
                     user_data_dir = desired_profile
                     logger.info("[PROFILE] Usando perfil Linux fijo: %s", user_data_dir)
-                    # Estado informativo
                     logger.info("Se inició el perfil de linux exitosamente: %s", user_data_dir)
                 else:
-                    logger.error("[PROFILE] La carpeta 'profile 2' existe pero no contiene archivos de perfil esperados: %s", desired_profile)
+                    logger.error("[PROFILE] La carpeta 'Profile 2' existe pero no contiene archivos de perfil esperados: %s", desired_profile)
                     user_data_dir = None
             else:
-                logger.warning("[PROFILE] No se encontró la carpeta linux 'profile 2' en chrome_profile_copy: %s", desired_profile)
+                logger.warning("[PROFILE] No se encontró la carpeta linux 'Profile 2' en chrome_profile_copy: %s", desired_profile)
                 user_data_dir = None
 
-        # Si tenemos un user_data_dir válido, lo añadimos como --user-data-dir. NO se realizará búsqueda de otros perfiles.
         ext_path = os.environ.get("EXT_PATH", str(repo_root / "extensions" / "myext")).strip()
         if user_data_dir:
             try:
                 user_data_dir = Path(user_data_dir).resolve()
                 chrome_options.add_argument(f'--user-data-dir={str(user_data_dir)}')
                 logger.info("[PROFILE] Añadido --user-data-dir=%s", user_data_dir)
-                # no añadimos --profile-directory adicional (usar el perfil tal cual)
+                # Detectar si el profile contiene la extensión "capsolver"
+                found_ext, ext_details = detect_capsolver_in_profile(user_data_dir)
+                if found_ext:
+                    logger.info("[PROFILE] Extensión 'capsolver' detectada en el profile. Detalles: %s", ext_details)
+                else:
+                    # si ext_details no está vacío, mostramos lo encontrado; si está vacío mostramos que no se encontró
+                    if ext_details:
+                        logger.info("[PROFILE] Se inspeccionó el profile pero no se detectó 'capsolver' explícitamente. Entradas encontradas: %d", len(ext_details))
+                    else:
+                        logger.info("[PROFILE] No se detectaron extensiones en profile o no hay 'capsolver' en manifest.json")
             except Exception:
                 logger.exception("[PROFILE] Error añadiendo user-data-dir (se arranca sin profile):")
         else:
@@ -804,23 +865,18 @@ def run_selenium_task(valor,
     except Exception:
         logger.exception("[PROFILE] Error inesperado configurando profile/extension:")
 
-    # Añadido: detach para mantener navegador si se quiere (como en tu snippet)
+    # Añadido: detach para mantener navegador si se quiere
     chrome_options.add_experimental_option("detach", True)
 
-    # Eliminado: --headless.new ya que usamos Xvfb
-    # if not VISIBLE:
-    #    chrome_options.add_argument('--headless=new')
-    
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     chrome_options.add_experimental_option('useAutomationExtension', False)
-    
-    # Configuraciones avanzadas para evitar detección
+
+    # Configuraciones avanzadas
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
-    # NOTE: no se añade '--disable-extensions' para permitir que la extensión instalada en el perfil funcione
     chrome_options.add_argument('--no-first-run')
     chrome_options.add_argument('--no-default-browser-check')
     chrome_options.add_argument('--disable-web-security')
@@ -836,38 +892,57 @@ def run_selenium_task(valor,
     chrome_options.add_argument('--window-size=1920,1080')
 
     # descargar/obtener ruta inicial (puede devolver carpeta o fichero)
-    raw_driver_path = ChromeDriverManager().install()
-    driver_executable = raw_driver_path
-
-    # si es una carpeta, buscar el ejecutable dentro (nombre exacto 'chromedriver' preferido)
-    if os.path.isdir(raw_driver_path):
-        for root, _, files in os.walk(raw_driver_path):
-            for fname in files:
-                if fname == 'chromedriver' or fname.startswith('chromedriver'):
-                    candidate = os.path.join(root, fname)
-                    # ignorar archivos claramente no binarios (ej: LICENSE, THIRD_PARTY...)
-                    if 'license' in fname.lower() or 'third_party' in fname.lower():
-                        continue
-                    driver_executable = candidate
-                    break
-            if driver_executable != raw_driver_path:
+    # Primero: usar chromedriver ya instalado en el sistema si existe (evita descargar).
+    possible_system_paths = [
+        "/usr/local/bin/chromedriver",
+        "/usr/bin/chromedriver",
+        "/opt/bin/chromedriver",
+        "/bin/chromedriver",
+        "/usr/local/bin/chromedriver-linux",
+    ]
+    driver_executable = None
+    for p in possible_system_paths:
+        try:
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                driver_executable = p
+                logger.info("[WEBDRIVER] Usando chromedriver desde sistema: %s", driver_executable)
                 break
+        except Exception:
+            pass
 
-    # si por alguna razón raw_driver_path no era carpeta pero apunta a un archivo raro,
-    # intentar buscar junto al archivo
-    if driver_executable == raw_driver_path:
-        parent = os.path.dirname(raw_driver_path)
-        if os.path.isdir(parent):
-            for f in os.listdir(parent):
-                if f == 'chromedriver' or f.startswith('chromedriver'):
-                    cand = os.path.join(parent, f)
-                    if os.path.isfile(cand) and 'third_party' not in f.lower() and 'license' not in f.lower():
-                        driver_executable = cand
+    if not driver_executable:
+        logger.info("[WEBDRIVER] chromedriver no encontrado en sistema, usando webdriver_manager (puede tardar).")
+        os.environ.setdefault("WDM_LOG_LEVEL", "ERROR")
+        raw_driver_path = ChromeDriverManager().install()
+        driver_executable = raw_driver_path
+
+        # si raw_driver_path es carpeta, buscar un ejecutable dentro
+        if os.path.isdir(raw_driver_path):
+            for root, _, files in os.walk(raw_driver_path):
+                for fname in files:
+                    if fname == 'chromedriver' or fname.startswith('chromedriver'):
+                        candidate = os.path.join(root, fname)
+                        if 'license' in fname.lower() or 'third_party' in fname.lower():
+                            continue
+                        driver_executable = candidate
                         break
+                if driver_executable != raw_driver_path:
+                    break
+
+        # fallback: buscar junto al archivo
+        if driver_executable == raw_driver_path:
+            parent = os.path.dirname(raw_driver_path)
+            if os.path.isdir(parent):
+                for f in os.listdir(parent):
+                    if f == 'chromedriver' or f.startswith('chromedriver'):
+                        cand = os.path.join(parent, f)
+                        if os.path.isfile(cand) and 'third_party' not in f.lower() and 'license' not in f.lower():
+                            driver_executable = cand
+                            break
 
     # forzar permisos ejecutables si es posible
     try:
-        if os.path.exists(driver_executable):
+        if driver_executable and os.path.exists(driver_executable):
             os.chmod(driver_executable, 0o755)
     except Exception:
         logger.debug("[!] No se pudo cambiar permisos al driver (continuo de todos modos)")
@@ -880,13 +955,14 @@ def run_selenium_task(valor,
     try:
         logger.debug("[*] Lanzando Chrome (visible=" + str(VISIBLE) + ") ...")
         driver = webdriver.Chrome(service=service, options=chrome_options)
-        
+        logger.info("[WEBDRIVER] Chrome/Chromedriver lanzados (si hubo problema ver chromedriver.log).")
+
         # Ejecutar script para eliminar webdriver property (no fatal si falla)
         try:
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         except Exception:
             pass
-        
+
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
 
         # Comprobar qué profile está usando realmente Chrome (intentar leer chrome://version)
@@ -896,7 +972,6 @@ def run_selenium_task(valor,
                 driver.get("chrome://version")
                 time.sleep(0.7)
                 src = driver.page_source or ""
-                # comprobación directa contra user_data_dir
                 try:
                     if 'user_data_dir' in locals() and user_data_dir and str(user_data_dir) in src:
                         logger.info("[PROFILE] Chrome arrancó usando el user-data-dir solicitado: %s", user_data_dir)
@@ -1107,13 +1182,108 @@ def run_selenium_task(valor,
                                 logger.exception("[!] Intentos de click en botón fallaron (robust-click)")
                 except Exception:
                     logger.exception("[!] Error al intentar click robusto en botón")
+
+                # -------------------------
+                # DIAGNÓSTICO ADICIONAL (tu petición):
+                # - atributos del botón
+                # - URL actual
+                # - comprobación de cambio en DOM (short poll)
+                # - revisión de iframes
+                # - detección de reCAPTCHA y token 'g-recaptcha-response'
+                # -------------------------
+                try:
+                    # obtener atributos y estado del elemento (safely)
+                    try:
+                        attrs = driver.execute_script("""
+                            var el = arguments[0];
+                            var a = {};
+                            try {
+                                for (var i=0;i<el.attributes.length;i++){ a[el.attributes[i].name]=el.attributes[i].value; }
+                            } catch(e){}
+                            try { a['_displayed'] = el.offsetParent !== null; } catch(e){}
+                            try { a['_disabled_attr'] = el.getAttribute('disabled'); } catch(e){}
+                            try { a['_aria_disabled'] = el.getAttribute('aria-disabled'); } catch(e){}
+                            try { a['_onclick'] = el.getAttribute('onclick') || (el.onclick ? 'has_func' : null); } catch(e){}
+                            try { a['_tag'] = el.tagName; } catch(e){}
+                            try { a['_text'] = (el.innerText||'').trim().slice(0,200); } catch(e){}
+                            return a;
+                        """, btn)
+                    except Exception:
+                        attrs = {'_error': 'no se pudo leer atributos del elemento'}
+
+                    logger.info("[DIAG] Atributos del botón tras click: %s", attrs)
+                    try:
+                        cur_url = driver.current_url
+                    except Exception:
+                        cur_url = "(no disponible)"
+                    logger.info("[DIAG] URL actual tras click: %s", cur_url)
+
+                    # longitud inicial del body
+                    try:
+                        initial_len = driver.execute_script("return (document.body && document.body.innerText) ? document.body.innerText.length : 0;")
+                    except Exception:
+                        initial_len = -1
+                    logger.info("[DIAG] Longitud inicial del body (chars): %s", initial_len)
+
+                    # Poll corto para detectar cambios en DOM
+                    dom_changed = False
+                    deadline = time.time() + 12  # 12s de comprobación reactiva
+                    while time.time() < deadline:
+                        try:
+                            cur_len = driver.execute_script("return (document.body && document.body.innerText) ? document.body.innerText.length : 0;")
+                            if cur_len != initial_len:
+                                dom_changed = True
+                                logger.info("[DIAG] Detectado cambio en DOM: %s -> %s chars", initial_len, cur_len)
+                                break
+                        except Exception:
+                            pass
+                        time.sleep(0.6)
+
+                    if not dom_changed:
+                        logger.info("[DIAG] No se detectó cambio de DOM tras click en ventana principal (12s).")
+                        # listar iframes (podría estar dentro de iframe)
+                        try:
+                            frames = driver.find_elements(By.TAG_NAME, "iframe")
+                            logger.info("[DIAG] Iframes en la página: %d", len(frames))
+                            for i, fr in enumerate(frames[:8]):
+                                try:
+                                    src = fr.get_attribute('src') or ''
+                                    logger.info("[DIAG] iframe[%d] src: %s", i, src[:300])
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                    # reCAPTCHA check: buscar iframe con recaptcha y textarea g-recaptcha-response
+                    try:
+                        recaptcha_iframes = driver.find_elements(By.CSS_SELECTOR, "iframe[src*='recaptcha'], iframe[src*='google.com/recaptcha'], iframe[src*='gstatic.com/recaptcha']")
+                        logger.info("[DIAG] Iframes detectados que parecen reCAPTCHA: %d", len(recaptcha_iframes))
+                    except Exception:
+                        recaptcha_iframes = []
+
+                    try:
+                        # revisar valor de g-recaptcha-response si existe
+                        token = None
+                        try:
+                            token = driver.execute_script("var el = document.querySelector('textarea[name=\"g-recaptcha-response\"]'); return el ? el.value : null;")
+                        except Exception:
+                            token = None
+                        if token:
+                            logger.info("[DIAG] Se detectó token de reCAPTCHA (g-recaptcha-response) con longitud: %d", len(token))
+                        else:
+                            logger.info("[DIAG] No se detectó token de reCAPTCHA en textarea 'g-recaptcha-response' (puede que use un iframe/token distinto).")
+                    except Exception:
+                        logger.exception("[DIAG] Error comprobando g-recaptcha-response")
+
+                except Exception:
+                    logger.exception("[DIAG] Error durante diagnóstico tras click")
+
             else:
                 logger.error("[!] No se pudo localizar ningún candidato para el botón (robust-click). Dejar en modo MANUAL si procede.")
         else:
             logger.info("[MANUAL] Por favor haz click en el botón Consultar (modo manual activo)")
 
         # ----------------- esperar resultado específico (xpath que proporcionaste) -----------------
-        # Aumentar tiempo de espera y tolerancia para resultados en entornos lentos
         result_wait_timeout = max(wait_timeout, 60)  # mínimo 60s
         if MANUAL_INTERACTION:
             result_wait_timeout = MANUAL_WAIT_TIMEOUT
@@ -1329,4 +1499,4 @@ def process():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=False)
