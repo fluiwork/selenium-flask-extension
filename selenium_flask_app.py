@@ -197,7 +197,38 @@ def resolve_locator(selector: str):
     return (By.CSS_SELECTOR, s)
 
 # -------------------------
-# Funciones login (solo flujo iframe 'loginunico')
+# NEW: Enhanced iframe handling with retries
+# -------------------------
+def wait_for_and_switch_to_iframe(driver, timeout=30):
+    """Wait for iframe to be available and switch to it"""
+    logger.info("[DEBUG] Waiting for login iframe...")
+    end_time = time.time() + timeout
+    while time.time() < end_time:
+        try:
+            frames = driver.find_elements(By.TAG_NAME, "iframe")
+            logger.info(f"[DEBUG] Found {len(frames)} iframes")
+            
+            for idx, frame in enumerate(frames):
+                try:
+                    src = frame.get_attribute("src") or ""
+                    logger.info(f"[DEBUG] Iframe {idx} src: {src}")
+                    if "loginunico" in src.lower() or "azurewebsites" in src.lower():
+                        driver.switch_to.frame(frame)
+                        logger.info(f"[DEBUG] Successfully switched to iframe {idx}")
+                        return True
+                except Exception as e:
+                    logger.debug(f"[DEBUG] Iframe {idx} error: {e}")
+                    continue
+            time.sleep(1)
+        except Exception as e:
+            logger.debug(f"[DEBUG] Iframe search error: {e}")
+            time.sleep(1)
+    
+    logger.error("[DEBUG] Could not find or switch to login iframe")
+    return False
+
+# -------------------------
+# Funciones login (solo flujo iframe 'loginunico') - MEJORADO
 # -------------------------
 def perform_login(driver,
                   login_url,
@@ -207,173 +238,187 @@ def perform_login(driver,
                   post_login_check_selector,
                   wait_timeout=ELEMENT_WAIT_TIMEOUT):
     logger.info("[*] Realizando login (robusto, flujo único - iframe 'loginunico') ...")
+    logger.info("[DEBUG] Starting enhanced login process")
+    
     try:
         try:
             driver.get(login_url)
+            logger.info(f"[DEBUG] Navigated to login URL: {login_url}")
         except Exception:
             logger.exception("[!] driver.get(login_url) fallo, prosigo con intentos.")
 
         try:
             WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
+            logger.info("[DEBUG] Page reached complete ready state")
         except Exception:
             logger.debug("[*] Advertencia: readyState no llegó a 'complete' en 10s (continúa)")
 
-        frames = driver.find_elements(By.TAG_NAME, "iframe")
-        logger.info("[*] Iframes detectados: %d", len(frames))
-        chosen_frame = None
-        for idx, fr in enumerate(frames):
-            try:
-                src = fr.get_attribute("src") or ""
-                low = src.lower()
-                if "loginunico" in low or "azurewebsites" in low or "loginunico-prd" in low:
-                    chosen_frame = fr
-                    logger.info("[*] Elegido iframe[%d] para login (src=%s)", idx, src)
-                    break
-            except Exception:
-                pass
-
-        if not chosen_frame:
-            for idx, fr in enumerate(frames):
-                try:
-                    driver.switch_to.frame(fr)
-                    inputs_in_frame = driver.find_elements(By.TAG_NAME, "input")
-                    if inputs_in_frame and len(inputs_in_frame) >= 1:
-                        chosen_frame = fr
-                        logger.info("[*] Elegido iframe[%d] por heurística (tiene inputs).", idx)
-                    driver.switch_to.default_content()
-                    if chosen_frame:
-                        break
-                except Exception:
-                    try:
-                        driver.switch_to.default_content()
-                    except Exception:
-                        pass
-
-        if not chosen_frame:
-            logger.error("[ERROR] No se encontró iframe de login adecuado.")
+        # NEW: Use enhanced iframe handling
+        if not wait_for_and_switch_to_iframe(driver, timeout=15):
+            logger.error("[ERROR] No se pudo encontrar o cambiar al iframe de login")
             return False
 
+        logger.info("[*] Dentro del iframe elegido, buscando campos de usuario/clave")
+
+        by_u, sel_u = resolve_locator(username_selector)
+        by_p, sel_p = resolve_locator(password_selector)
+        user_el = None
+        pass_el = None
+        
+        logger.info("[DEBUG] Looking for username field...")
         try:
-            driver.switch_to.frame(chosen_frame)
-            logger.info("[*] Dentro del iframe elegido, buscando campos de usuario/clave")
+            els_u = driver.find_elements(by_u, sel_u)
+            logger.info(f"[DEBUG] Found {len(els_u)} username elements")
+            if els_u:
+                user_el = els_u[0]
+                logger.info("[DEBUG] Username field found with primary selector")
+        except Exception as e:
+            logger.info(f"[DEBUG] Username primary selector failed: {e}")
 
-            by_u, sel_u = resolve_locator(username_selector)
-            by_p, sel_p = resolve_locator(password_selector)
-            user_el = None
-            pass_el = None
-            try:
-                els_u = driver.find_elements(by_u, sel_u)
-                if els_u:
-                    user_el = els_u[0]
-            except Exception:
-                pass
+        logger.info("[DEBUG] Looking for password field...")
+        try:
+            els_p = driver.find_elements(by_p, sel_p)
+            logger.info(f"[DEBUG] Found {len(els_p)} password elements")
+            if els_p:
+                pass_el = els_p[0]
+                logger.info("[DEBUG] Password field found with primary selector")
+        except Exception as e:
+            logger.info(f"[DEBUG] Password primary selector failed: {e}")
 
-            try:
-                els_p = driver.find_elements(by_p, sel_p)
-                if els_p:
-                    pass_el = els_p[0]
-            except Exception:
-                pass
-
-            if not user_el:
-                for cand in ['input[type="text"]', 'input[type="email"]', 'input[id*="user"]', 'input[name*="user"]', 'input[id*="username"]']:
-                    try:
-                        els = driver.find_elements(By.CSS_SELECTOR, cand)
-                        if els:
-                            user_el = els[0]
-                            break
-                    except Exception:
-                        pass
-
-            if not pass_el:
-                for cand in ['input[type="password"]', 'input[id*="pass"]', 'input[name*="pass"]', 'input[id*="password"]']:
-                    try:
-                        els = driver.find_elements(By.CSS_SELECTOR, cand)
-                        if els:
-                            pass_el = els[0]
-                            break
-                    except Exception:
-                        pass
-
-            if not user_el or not pass_el:
-                logger.error("[!] No se localizaron campos de login dentro del iframe seleccionado.")
-                driver.switch_to.default_content()
-                return False
-
-            USER = os.environ.get("MI_SITIO_USER")
-            PASS = os.environ.get("MI_SITIO_PASS")
-            if not USER or not PASS:
-                logger.error("[!] Credenciales no configuradas en variables de entorno.")
-                driver.switch_to.default_content()
-                return False
-
-            try:
-                user_el.clear()
-            except Exception:
-                pass
-            user_el.send_keys(USER)
-            try:
-                pass_el.clear()
-            except Exception:
-                pass
-            pass_el.send_keys(PASS)
-
-            submitted = False
-            try:
-                btns = driver.find_elements(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
-                if btns:
-                    for b in btns:
-                        try:
-                            driver.execute_script("arguments[0].click();", b)
-                            submitted = True
-                            break
-                        except Exception:
-                            pass
-                if not submitted:
-                    bxp = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'ingresar') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'iniciar') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'entrar')]"
-                    els_b = driver.find_elements(By.XPATH, bxp)
-                    if els_b:
-                        try:
-                            driver.execute_script("arguments[0].click();", els_b[0])
-                            submitted = True
-                        except Exception:
-                            pass
-            except Exception:
-                logger.exception("[!] Error intentando submit dentro del iframe:")
-
-            driver.switch_to.default_content()
-
-            if not submitted:
-                logger.warning("[!] No se pudo pulsar submit dentro del iframe.")
-                return False
-
-            try:
-                by_check, sel_check = resolve_locator(post_login_check_selector)
-                WebDriverWait(driver, wait_timeout).until(EC.presence_of_element_located((by_check, sel_check)))
-                logger.info("[+] Login confirmado en document principal tras submit en iframe")
-                # --- Navegar inmediatamente al TARGET_URL para evitar quedarse en la página intermedia ---
+        # Fallback para username
+        if not user_el:
+            logger.info("[DEBUG] Trying fallback selectors for username...")
+            for cand in ['input[type="text"]', 'input[type="email"]', 'input[id*="user"]', 'input[name*="user"]', 'input[id*="username"]']:
                 try:
-                    driver.get(TARGET_URL)
-                    WebDriverWait(driver, 6).until(lambda d: d.execute_script("return document.readyState") == "complete")
-                    logger.info("[*] Redirigido a TARGET_URL inmediatamente tras login")
-                except Exception:
-                    logger.info("[*] No se pudo redirigir inmediatamente a TARGET_URL o la carga fue lenta, el flujo continuará normalmente.")
-                save_cookies_to_file(driver)
-                return True
-            except Exception:
-                logger.warning("[!] No se detectó post-login tras submit en iframe (posible fallo).")
-                return False
+                    els = driver.find_elements(By.CSS_SELECTOR, cand)
+                    if els:
+                        user_el = els[0]
+                        logger.info(f"[DEBUG] Username field found with fallback: {cand}")
+                        break
+                except Exception as e:
+                    logger.debug(f"[DEBUG] Username fallback {cand} failed: {e}")
 
-        except Exception:
-            logger.exception("[!] Error dentro del iframe durante login:")
+        # Fallback para password
+        if not pass_el:
+            logger.info("[DEBUG] Trying fallback selectors for password...")
+            for cand in ['input[type="password"]', 'input[id*="pass"]', 'input[name*="pass"]', 'input[id*="password"]']:
+                try:
+                    els = driver.find_elements(By.CSS_SELECTOR, cand)
+                    if els:
+                        pass_el = els[0]
+                        logger.info(f"[DEBUG] Password field found with fallback: {cand}")
+                        break
+                except Exception as e:
+                    logger.debug(f"[DEBUG] Password fallback {cand} failed: {e}")
+
+        if not user_el or not pass_el:
+            logger.error("[!] No se localizaron campos de login dentro del iframe seleccionado.")
+            # Check for error messages
             try:
-                driver.switch_to.default_content()
-            except Exception:
-                pass
+                error_elements = driver.find_elements(By.CSS_SELECTOR, ".error, .alert, .message-error, .text-danger")
+                if error_elements:
+                    logger.error(f"[DEBUG] Error messages in iframe: {[el.text for el in error_elements if el.text]}")
+            except Exception as e:
+                logger.debug(f"[DEBUG] Error checking for error messages: {e}")
+            driver.switch_to.default_content()
+            return False
+
+        USER = os.environ.get("MI_SITIO_USER")
+        PASS = os.environ.get("MI_SITIO_PASS")
+        if not USER or not PASS:
+            logger.error("[!] Credenciales no configuradas en variables de entorno.")
+            driver.switch_to.default_content()
+            return False
+
+        logger.info("[DEBUG] Filling credentials...")
+        try:
+            user_el.clear()
+        except Exception:
+            pass
+        user_el.send_keys(USER)
+        logger.info("[DEBUG] Username filled")
+        
+        try:
+            pass_el.clear()
+        except Exception:
+            pass
+        pass_el.send_keys(PASS)
+        logger.info("[DEBUG] Password filled")
+
+        submitted = False
+        logger.info("[DEBUG] Attempting form submission...")
+        try:
+            btns = driver.find_elements(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+            logger.info(f"[DEBUG] Found {len(btns)} submit buttons")
+            if btns:
+                for b in btns:
+                    try:
+                        driver.execute_script("arguments[0].click();", b)
+                        submitted = True
+                        logger.info("[DEBUG] Form submitted with JavaScript")
+                        break
+                    except Exception as e:
+                        logger.debug(f"[DEBUG] JS click failed: {e}")
+                        continue
+            if not submitted:
+                bxp = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'ingresar') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'iniciar') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'entrar')]"
+                els_b = driver.find_elements(By.XPATH, bxp)
+                logger.info(f"[DEBUG] Found {len(els_b)} buttons with text fallback")
+                if els_b:
+                    try:
+                        driver.execute_script("arguments[0].click();", els_b[0])
+                        submitted = True
+                        logger.info("[DEBUG] Form submitted with text fallback")
+                    except Exception as e:
+                        logger.debug(f"[DEBUG] Text fallback submit failed: {e}")
+        except Exception as e:
+            logger.exception(f"[!] Error intentando submit dentro del iframe: {e}")
+
+        driver.switch_to.default_content()
+        logger.info("[DEBUG] Switched back to default content")
+
+        if not submitted:
+            logger.warning("[!] No se pudo pulsar submit dentro del iframe.")
+            return False
+
+        logger.info("[DEBUG] Checking for post-login element...")
+        try:
+            by_check, sel_check = resolve_locator(post_login_check_selector)
+            WebDriverWait(driver, wait_timeout).until(EC.presence_of_element_located((by_check, sel_check)))
+            logger.info("[+] Login confirmado en document principal tras submit en iframe")
+            
+            # NEW: Enhanced login recovery
+            try:
+                driver.get(TARGET_URL)
+                WebDriverWait(driver, 8).until(lambda d: d.execute_script("return document.readyState") == "complete")
+                logger.info("[*] Redirigido a TARGET_URL inmediatamente tras login")
+            except Exception as e:
+                logger.info(f"[*] No se pudo redirigir inmediatamente a TARGET_URL: {e}")
+            
+            save_cookies_to_file(driver)
+            return True
+        except Exception as e:
+            logger.warning(f"[!] No se detectó post-login tras submit en iframe: {e}")
+            
+            # NEW: Enhanced error recovery
+            logger.info("[DEBUG] Attempting login recovery...")
+            try:
+                current_url = driver.current_url.lower()
+                if 'login' not in current_url and 'auth' not in current_url:
+                    logger.info("[DEBUG] Recovery: Already logged in despite earlier failure")
+                    save_cookies_to_file(driver)
+                    return True
+            except Exception as url_error:
+                logger.debug(f"[DEBUG] URL check failed: {url_error}")
+            
             return False
 
     except Exception:
         logger.exception("[!] perform_login fallo inesperado:")
+        try:
+            driver.switch_to.default_content()
+        except Exception:
+            pass
         return False
 
 
@@ -705,7 +750,7 @@ def has_desired_structure(text):
     return False
 
 # -------------------------
-# Funcion principal Selenium (integrada)
+# Funcion principal Selenium (integrada) - MEJORADA
 # -------------------------
 def run_selenium_task(valor,
                       target_url=TARGET_URL,
@@ -720,6 +765,13 @@ def run_selenium_task(valor,
                       post_login_check_selector=POST_LOGIN_CHECK_SELECTOR,
                       wait_timeout=ELEMENT_WAIT_TIMEOUT):
     
+    # NEW: Detect Render environment and adjust timeouts
+    is_render = os.environ.get('RENDER', False)
+    if is_render:
+        logger.info("[DEBUG] Running in Render environment - adjusting timeouts")
+        wait_timeout = max(wait_timeout, 45)
+        PAGE_LOAD_TIMEOUT = 60
+
     # Iniciar Xvfb para entorno headless - CONFIGURACIÓN MEJORADA
     display = None
     display_var = os.environ.get('DISPLAY')
@@ -948,15 +1000,21 @@ def run_selenium_task(valor,
     except Exception:
         logger.exception("[PROFILE] Error inesperado configurando profile/extension:")
 
-    # Añadido: detach para mantener navegador si se quiere (como en tu snippet)
+    # NEW: Enhanced Chrome configuration for Linux/Render
     chrome_options.add_experimental_option("detach", True)
-
-    # Eliminado: --headless.new ya que usamos Xvfb
-    # if not VISIBLE:
-    #    chrome_options.add_argument('--headless=new')
     
+    # Essential for Linux environments
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--remote-debugging-port=9222')
+    
+    # Enhanced compatibility flags for headless
+    if not VISIBLE:
+        chrome_options.add_argument('--headless=new')
+        chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+        chrome_options.add_argument('--disable-software-rasterizer')
+    
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     
@@ -1106,9 +1164,9 @@ def run_selenium_task(valor,
         time.sleep(1.0)
         try:
             current = driver.current_url or ""
+            logger.info("[*] URL actual tras navegación: %s", current)
         except Exception:
             current = ""
-        logger.info("[*] URL actual tras navegación: %s", current)
 
         if 'login' in current.lower() or 'auth' in current.lower() or (not logged and ('clientes' in current and 'paga-tus-facturas' not in current)):
             logger.info("[*] Detectada redirección a login o no estamos logueados; reintentando login y luego navegando al target_url.")
@@ -1423,4 +1481,4 @@ def process():
 
 if __name__ == '__main__':
     # Ejecutar Flask con debug=False para evitar logs de desarrollo
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=True)
