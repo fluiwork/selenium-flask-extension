@@ -1,3 +1,3 @@
-2025/10/06-01:17:02.335 5f14 Reusing MANIFEST C:\Users\ASUS\Desktop\Borradores\chrome_profile_copy\Profile 2\Sync Data\LevelDB/MANIFEST-000001
-2025/10/06-01:17:02.344 5f14 Recovering log #3
-2025/10/06-01:17:02.345 5f14 Reusing old log C:\Users\ASUS\Desktop\Borradores\chrome_profile_copy\Profile 2\Sync Data\LevelDB/000003.log 
+2025/10/05-16:31:42.664 58ab Reusing MANIFEST /home/kali/.config/google-chrome/Profile 1/Sync Data/LevelDB/MANIFEST-000001
+2025/10/05-16:31:42.669 58ab Recovering log #3
+2025/10/05-16:31:42.669 58ab Reusing old log /home/kali/.config/google-chrome/Profile 1/Sync Data/LevelDB/000003.log 
