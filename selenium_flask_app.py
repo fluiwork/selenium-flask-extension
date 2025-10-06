@@ -843,8 +843,19 @@ def run_selenium_task(valor,
             except Exception:
                 logger.exception("[PROFILE] Error inspeccionando el profile for Windows-compatibility:")
 
-        # Si estamos en Linux (Render) y el profile parece Windows, buscar un perfil Linux alternativo en repo
-        ext_path = os.environ.get("EXT_PATH", str(repo_root / "extensions" / "myext")).strip()
+        # -------------------------
+        # NUEVO: Diagnóstico y forzado de carga de extensión unpacked
+        # -------------------------
+        # ext_path se usará para --load-extension si no usamos perfil o si el perfil no es válido
+        manifest_name = None
+        ext_path_raw = os.environ.get("EXT_PATH", str(repo_root / "extensions" / "myext")).strip()
+        try:
+            ext_path = Path(ext_path_raw)
+        except Exception:
+            ext_path = Path(str(repo_root / "extensions" / "myext"))
+
+        logger.info("[EXT DEBUG] EXT_PATH resuelto a: %s (exists=%s)", ext_path, ext_path.exists())
+
         if profile_is_windows and not running_on_windows:
             logger.error("[PROFILE] Perfil detectado como Windows pero el host es Linux. Buscando perfil Linux alternativo en repo...")
             linux_candidate = None
@@ -875,15 +886,7 @@ def run_selenium_task(valor,
             else:
                 logger.error("[PROFILE] No se encontró perfil Linux alternativo válido en repo. Haré fallback a cargar extensión unpacked (si existe).")
                 user_data_dir = None
-                if ext_path and Path(ext_path).is_dir():
-                    try:
-                        chrome_options.add_argument(f'--load-extension={ext_path}')
-                        logger.warning("[PROFILE] Fallback: cargando extension unpacked desde: %s", ext_path)
-                    except Exception:
-                        logger.exception("[PROFILE] Error añadiendo --load-extension:")
-                else:
-                    logger.warning("[PROFILE] EXT_PATH no existe (%s). Chrome arrancará con perfil limpio en Render.", ext_path)
-
+                # Intento forzado de carga de extension unpacked más abajo
         # Si no hicimos fallback y el profile existe, usarlo (primero sin profile-directory)
         if user_data_dir:
             try:
@@ -910,15 +913,37 @@ def run_selenium_task(valor,
             except Exception:
                 logger.exception("[PROFILE] Error añadiendo user-data-dir/profile-directory:")
         else:
-            # no hay profile válido: si no se añadió ext_path antes, intentar ahora
-            if ext_path and Path(ext_path).is_dir():
-                try:
-                    chrome_options.add_argument(f'--load-extension={ext_path}')
-                    logger.warning("[PROFILE] No hay profile; cargando extension unpacked desde: %s", ext_path)
-                except Exception:
-                    logger.exception("[PROFILE] No se pudo añadir --load-extension:")
-            else:
-                logger.warning("[PROFILE] No se usará profile ni extension; Chrome arrancará con perfil limpio.")
+            # no hay profile válido: intentar cargar extensión unpacked desde ext_path
+            try:
+                if ext_path.exists() and ext_path.is_dir():
+                    # inspeccionar manifest.json
+                    try:
+                        items = [p.name for p in ext_path.iterdir()]
+                        logger.info("[EXT DEBUG] Contenido de ext_path (primeros 30): %s", items[:30])
+                    except Exception:
+                        logger.info("[EXT DEBUG] No se pudo listar ext_path")
+
+                    manifest_file = ext_path / "manifest.json"
+                    if manifest_file.exists():
+                        try:
+                            m = json.loads(manifest_file.read_text(encoding='utf-8', errors='ignore'))
+                            manifest_name = m.get('name') or m.get('short_name')
+                            logger.info("[EXT DEBUG] manifest.json encontrado. name=%s, version=%s", manifest_name, m.get('version'))
+                        except Exception:
+                            logger.exception("[EXT DEBUG] Error leyendo manifest.json")
+                    else:
+                        logger.warning("[EXT DEBUG] No se encontró manifest.json en %s. ¿estás apuntando a Extensions/<id>/<version> en lugar de unpacked?", ext_path)
+
+                    try:
+                        chrome_options.add_argument(f'--disable-extensions-except={str(ext_path)}')
+                        chrome_options.add_argument(f'--load-extension={str(ext_path)}')
+                        logger.warning("[EXT DEBUG] Añadidos flags --disable-extensions-except y --load-extension para %s", ext_path)
+                    except Exception:
+                        logger.exception("[EXT DEBUG] Error añadiendo flags de extensión")
+                else:
+                    logger.warning("[EXT DEBUG] ext_path no existe o no es un directorio: %s", ext_path)
+            except Exception:
+                logger.exception("[EXT DEBUG] Error inspeccionando ext_path")
 
     except Exception:
         logger.exception("[PROFILE] Error inesperado configurando profile/extension:")
@@ -926,7 +951,7 @@ def run_selenium_task(valor,
     # Añadido: detach para mantener navegador si se quiere (como en tu snippet)
     chrome_options.add_experimental_option("detach", True)
 
-    # Eliminado: --headless=new ya que usamos Xvfb
+    # Eliminado: --headless.new ya que usamos Xvfb
     # if not VISIBLE:
     #    chrome_options.add_argument('--headless=new')
     
@@ -1027,6 +1052,24 @@ def run_selenium_task(valor,
                 logger.info("[PROFILE] No se pudo abrir chrome://version (posible bloqueo en entorno headless).")
         except Exception:
             logger.exception("[PROFILE] Error comprobando chrome://version:")
+
+        # ---- NUEVO: después de arrancar el driver, comprobar chrome://extensions para ver si la extensión aparece ----
+        try:
+            if manifest_name:
+                try:
+                    driver.get("chrome://extensions/")
+                    time.sleep(0.8)
+                    src_ext = driver.page_source or ""
+                    if manifest_name.lower() in src_ext.lower():
+                        logger.info("[EXT CHECK] La extensión aparece en chrome://extensions (nombre detectado: %s).", manifest_name)
+                    else:
+                        logger.warning("[EXT CHECK] La extensión NO aparece en chrome://extensions. Revisa chromedriver.log o la consola de extensiones.")
+                        logger.debug("[EXT CHECK] chrome://extensions page snippet: %s", (src_ext or "")[:2000])
+                except Exception:
+                    logger.exception("[EXT CHECK] Error intentando inspeccionar chrome://extensions")
+        except Exception:
+            pass
+        # ---- FIN NUEVO ----
 
         USER = os.environ.get("MI_SITIO_USER")
         PASS = os.environ.get("MI_SITIO_PASS")
@@ -1380,4 +1423,4 @@ def process():
 
 if __name__ == '__main__':
     # Ejecutar Flask con debug=False para evitar logs de desarrollo
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=False)
